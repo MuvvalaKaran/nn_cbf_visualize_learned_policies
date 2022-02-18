@@ -1,0 +1,18 @@
+# ignore the D4PG, DDPG repos
+D4PG/
+DDPG/
+
+# ignore video repositories
+NN_videos/
+rl_agent_video/
+
+# ignore repo that have only plots, NN_models
+cartpole_models/
+pendulum_models/
+pendulum_imitation_models/
+models_comparisions/
+husky_Models/
+
+# ignore cache files, .idea abd pycharm files
+__pycache__/
+.idea/
