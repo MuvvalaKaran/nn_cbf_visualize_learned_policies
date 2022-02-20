@@ -1,5 +1,5 @@
 import sys
-
+import gym
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -13,60 +13,110 @@ from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models
 from gym.wrappers.monitoring import video_recorder
 
 
-def plot_delta_models_fixed_init_state():
+class PendulumAgent:
+    def decide(self, observation):
+        x, y, angle_velocity = observation
+        flip = (y < 0.)
+        if flip:
+            y *= -1. # now y >= 0
+            angle_velocity *= -1.
+        angle = np.arcsin(y)
+        if x < 0.:
+            angle = np.pi - angle
+        if (angle < -0.3 * angle_velocity) or \
+                (angle > 0.03 * (angle_velocity - 2.5) ** 2. + 1.
+                 and angle < 0.15 * (angle_velocity + 3.) ** 2. + 2.):
+            force = 2.
+        else:
+            force = -2.
+        if flip:
+            force *= -1.
+        action = np.array([force,])
+        # action = force
+        return action
+
+
+def plot_delta_models_fixed_init_state(system_dimension: int, pendulum_radius=0.5):
     deg = 0
     thdot = 0
 
-    # fig, axs = plt.subplots(3)
-    # fig.suptitle(f'Pendulum Stabilization -model deg {deg}')
-    # fig.set_size_inches(18.5, 10.5, forward=True)
+    assert pendulum_radius >= 0.1 and pendulum_radius <= 1.0, "Please enter arm length between 0.1 and 1.0"
+
+    fig, axs = plt.subplots(system_dimension)
+    fig.suptitle(f'Pendulum Stabilization -model deg {deg}')
+    fig.set_size_inches(18.5, 10.5, forward=True)
+
+    if system_dimension == 2:
+        init_state = np.array([deg * 0.0175, thdot])
+    elif system_dimension == 3:
+        init_state = np.array([deg * 0.0175, thdot, pendulum_radius])
+    else:
+        print("Invalid system dimension length for Pendulum System")
+        sys.exit(-1)
 
     color_scheme: list = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:brown', 'tab:cyan', 'tab:purple',
                           'tab:olive', 'tab:pink', 'tab:gray']
-    compare_pendulum_models_stability(use_multiple_models=True,
+    compare_pendulum_models_stability(use_multiple_models=False,
+                                      system_dimension=system_dimension,
                                       use_akashs_model=False,
-                                      # init_state=np.array([math.cos(deg * 0.0175), math.sin(deg * 0.0175),
-                                      #                      thdot]),
-                                      init_state=np.array([0, 0,
-                                                           thdot]),
+                                      model_dir_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.5_data_7500",
+                                      init_state=init_state,
                                       color=color_scheme[0],
                                       legend=f'{thdot} thdot',
-                                      fig_axs=None)
+                                      fig_axs=axs)
 
     plt.show(block=True)
 
 
-def plot_delta_model_vs_deg_vs_thdot(save_flag: bool = False):
+def plot_delta_model_vs_deg_vs_thdot(system_dimension: int,
+                                     pendulum_radius=0.5,
+                                     save_flag: bool = False):
     """
     A helper function to a model's performance for various theta vs thetadot
 
     :return:
     """
     degs = np.arange(-20, 21, 5)
-    theta_dot = np.arange(-2.5, 2.5, 0.5)
+    theta_dot = np.arange(-0.5, 0.5, 0.1)
     color_scheme: list = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:brown', 'tab:cyan', 'tab:purple',
                           'tab:olive', 'tab:pink', 'tab:gray']
     # legend_list = ['model1', 'model2', 'model3', 'model4', 'model5', 'model6', 'model7']
 
+    assert pendulum_radius >= 0.1 and pendulum_radius <= 1.0, "Please enter arm length between 0.1 and 1.0"
+
     for c_counter, deg in enumerate(degs):
-        # fig, axs = plt.subplots(3)
-        # fig.suptitle(f'Pendulum Stabilization -model deg {deg}')
-        # fig.set_size_inches(18.5, 10.5, forward=True)
+        fig, axs = plt.subplots(system_dimension)
+        fig.suptitle(f'Pendulum Stabilization -model deg {deg}')
+        fig.set_size_inches(18.5, 10.5, forward=True)
 
         for l_counter, thdot in enumerate(theta_dot):
+
+            if system_dimension == 2:
+                init_state = np.array([deg * 0.0175, thdot])
+            elif system_dimension == 3:
+                init_state = np.array([deg * 0.0175, thdot, pendulum_radius])
+            else:
+                print("Invalid system dimension length for Pendulum System")
+                sys.exit(-1)
+
             compare_pendulum_models_stability(use_akashs_model=False,
+                                              system_dimension=system_dimension,
+                                              use_multiple_models=True,
                                               model_dir_path=
-                                              "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
-                                              init_state=np.array([math.cos(deg * 0.0175), math.sin(deg * 0.0175),
-                                                                   thdot]),
+                                              # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
+                                              # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.004_data_7500",
+                                              "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.5_data_7500",
+                                              # init_state=np.array([math.cos(deg * 0.0175), math.sin(deg * 0.0175),
+                                              #                      thdot]),
+                                              init_state=init_state,
                                               color=color_scheme[l_counter],
                                               legend=f'{thdot}',
-                                              fig_axs=None)
+                                              fig_axs=axs)
             plt.plot()
 
         if save_flag:
-            fig_dir_path = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_models/"
-            fig_name = f'pendulum_model_evolution_deg_{deg}.png'
+            fig_dir_path = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/new_pendulum_imitation_models/"
+            fig_name = f'pendulum_2d_best_model_evolution_deg_{deg}.png'
             full_name = fig_dir_path + fig_name
             fig.savefig(full_name)
         else:
@@ -110,16 +160,133 @@ def animate_nn_behavior(state_matrix):
     sys.exit(-1)
 
 
+def plot_2d_pendulum_data(scatter_plot: bool = False,
+                          scale: float = 1.0):
+    data_dir_list = [
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_2500.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_5000.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_7500.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_10000.txt",
+    ]
+
+    data = pd.read_csv(data_dir_list[2])
+
+    fig, ax = plt.subplots()
+    fig.suptitle(f'Pendulum Input & Output Data')
+    fig.set_size_inches(18.5, 10.5, forward=True)
+
+    #IP
+    X_data = data[["ip1", "ip2"]].values
+    # OP
+    Y_data = data[["op1", "op2"]].values
+
+    if scatter_plot:
+        ax.set_xlabel(r"$\theta$")
+        ax.set_ylabel(r"$\dot{\theta}$")
+        ax.scatter(X_data[:, 0], X_data[:, 1])
+
+        ax.scatter(Y_data[:, 0], Y_data[:, 1], c='r')
+
+    else:
+        for num in range(X_data.shape[0]):
+            curr_state = X_data[num, :]
+            op = Y_data[num, :]
+            ax.arrow(x=curr_state[0] * 180 / math.pi,
+                     y=curr_state[1],
+                     dx=scale * (op[0] - curr_state[0]) * 180 / math.pi,
+                     dy=scale * (op[1] - curr_state[1]),
+                     color='red',
+                     # head_width=0.05,
+                     # length_includes_head=True,
+                     alpha=0.5)
+
+    plt.xticks(np.arange(-180, 181, step=10))  # Set label locations.
+    plt.grid(visible=True)
+    plt.show(block=True)
+
+
+def simulate_new_3d_pendulum_behavior(init_state: np.array, rollout: int = 100):
+    model_dir_list = [
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.01_data_5000",
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.01_data_10000",
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.5_data_7500"
+        ]
+
+    for model_dir in model_dir_list:
+        # load model
+        model = tf.keras.models.load_model(model_dir)
+
+        observation = init_state.reshape(1, 3)
+        # col = stat diff # row = time step
+        state_diff = np.zeros(shape=(rollout, observation.shape[1]))
+        counter = 0
+        for step in range(rollout):
+            # roll out
+            next_state = model.predict(observation)
+            # next_state = akash_model.predict(observation)
+            # state_diff[step] = abs(next_state - observation)
+            state_diff[step] = next_state
+            if next_state[0, 2] <= 0.1 or next_state[0, 2] >= 2.0:
+                counter = step
+                break
+            observation = next_state
+
+        fig, ax = plt.subplots()
+        ax.set_ylabel(r"$\theta$")
+        ax.set_xlabel(r"$r$")
+        # ax.set_zlabel(r"$\dot{\theta}$")
+        plt.title("System Behavior")
+
+        # plot the line first and scatter plot manually
+        ax.plot(
+            state_diff[:counter, 2],
+                state_diff[:counter, 0], 'C3', lw=3)
+        plt.show()
+
+
+        numDataPoints = counter
+        for num in range(numDataPoints):
+            ax.scatter(state_diff[num, 2],
+                       state_diff[num, 0],
+                       # lw=2,
+                       s=120,
+                       zorder=2.5,)
+                       # linestyle='dashed')
+                       # cmap=plt.get_cmap('Blues'),)
+                       # marker='o')
+
+        # ax.plot(state_diff[:, 0],
+        #         state_diff[:, 1],
+        #         # lw=2,
+        #         'o-', )
+        # linestyle='dashed')
+        # cmap=plt.get_cmap('Blues'),)
+        # marker='o')
+            plt.plot()
+            plt.pause(0.1)
+
+        plt.show()
+
+
+
+
 
 
 
 def plot_3d_data():
     data_dir_list = [
-        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_2500.txt",
-        # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_5000.txt",
-        # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_7500.txt",
-        # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_10000.txt",
-    ]
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_3d_2500.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_3d_5000.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_3d_7500.txt",
+        "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_3d_10000.txt"
+        ]
+
+    # data_dir_list = [
+    #     "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_2500.txt",
+    #     # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_5000.txt",
+    #     # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_7500.txt",
+    #     # "/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/pendulum_v0_10000.txt",
+    # ]
 
     for data_dir in data_dir_list:
         data = pd.read_csv(data_dir)
@@ -136,22 +303,24 @@ def plot_3d_data():
         Z = X_data[:, 2][:, np.newaxis].T
         # C = X_data[:, 3][:, np.newaxis].T
 
-        ax.set_xlabel(r"$x$")
-        ax.set_ylabel(r"$y$")
-        ax.set_zlabel(r"$\dot{\theta}$")
+        ax.set_xlabel(r"$\theta_k$")
+        ax.set_ylabel(r"$\dot{\theta_k}$")
+        ax.set_zlabel(r"$r_k$")
         plt.title("Input Data visualization - Data:{}".format(X_data.shape[0]))
 
-        img = ax.scatter(X, Y, Z)#, c=C, cmap=plt.get_cmap('Blues'))
+        # img = ax.scatter(X, Y, Z)#, c=C, cmap=plt.get_cmap('Blues'))
 
         X = Y_data[:, 0][:, np.newaxis].T
         Y = Y_data[:, 1][:, np.newaxis].T
         Z = Y_data[:, 2][:, np.newaxis].T
         # C = X_data[:, 3][:, np.newaxis].T
 
-        ax.set_xlabel(r"$x$")
-        ax.set_ylabel(r"$y$")
-        ax.set_zlabel(r"$\dot{\theta}$")
-        plt.title("Output Data visualization - Data:{}".format(Y_data.shape[0]))
+        ax.set_xlabel(r"$\theta_{k+1}$")
+        ax.set_ylabel(r"$\dot{\theta}_{k+1}$")
+        ax.set_zlabel(r"$r_{k+1}$")
+        # plt.title("Output Data visualization - Data:{}".format(Y_data.shape[0]))
+
+        img = ax.scatter(X, Y, Z)  # , c=C, cmap=plt.get_cmap('Blues'))
 
         # fig.colorbar(img)
     plt.show()
@@ -163,31 +332,31 @@ def get_angle_from_x_y_coordinates(x_coord, y_coord):
     return theta
 
 
-def get_3d_coords_from_2_coords(_2d_state):
+def get_3d_coords_from_2_coords(_2d_state, radius: float = 1.0) -> np.array:
     """
     A helper function to convert 2d state used by the pendulum gym render() function to 3d coordinate used NN learned
     system
 
     :param _2d_state:
+    :param radius:
     :return:
     """
-    x_coord, y_coord = get_x_y_from_theta(_2d_state[0])
+    x_coord, y_coord = get_x_y_from_theta(_2d_state[0], radius=radius)
 
     return np.array([x_coord, y_coord, _2d_state[1]])
 
 
-
-def get_x_y_from_theta(theta_rad):
-    x = math.cos(theta_rad)
-    y = math.sin(theta_rad)
+def get_x_y_from_theta(theta_rad, radius: float = 1.0):
+    x = radius * math.cos(theta_rad)
+    y = radius * math.sin(theta_rad)
 
     return x, y
 
 
 def simulate_learned_pendulum_model(model,
                                     gym_env,
-                                    theta = None,
-                                    init_state = None,
+                                    theta=None,
+                                    init_state=None,
                                     record_flag: bool = False,
                                     rollout_steps: int = 500):
     if theta is None:
@@ -218,10 +387,12 @@ def simulate_learned_pendulum_model(model,
     curr_state = _2d_init_state.reshape(2, )
     for steps in range(rollout_steps):
         # get next state
-        _3d_state = get_3d_coords_from_2_coords(curr_state)
-        next_state = model.predict(_3d_state.reshape(1, 3))
-        next_state = np.array([get_angle_from_x_y_coordinates(x_coord=next_state[0, 0], y_coord=next_state[0, 1]),
-                               next_state[0, 2]])
+        # _3d_state = get_3d_coords_from_2_coords(curr_state)
+        # next_state = model.predict(_3d_state.reshape(1, 3))
+        # next_state = np.array([get_angle_from_x_y_coordinates(x_coord=next_state[0, 0], y_coord=next_state[0, 1]),
+        #                        next_state[0, 2]])
+
+        next_state = model.predict(curr_state.reshape(1, 2))
 
         gym_env.unwrapped.state = next_state.reshape(2, )
         if record_flag:
@@ -251,26 +422,29 @@ def simulate_pendulum(gym_env):
                         other models
     """
 
-    model_dirs = [
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",  # model 1
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_5000", # model 2
-    "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",  # model 3
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_7500",  # model 4
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.001_data_7500",  # model 5
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_10000",  # model 6
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.01_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.001_data_2500",  # model 7
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.0015_data_5000",  # model 8
-    ]
+    # OLD PENDULUM MODELS
+    # model_dirs = [
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",  # model 1
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_5000", # model 2
+    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",  # model 3
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_7500",  # model 4
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.001_data_7500",  # model 5
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_10000",  # model 6
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.01_data_2500",
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.001_data_2500",  # model 7
+    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.0015_data_5000",  # model 8
+    # ]
 
-    model_dirs = ['1, ']
+    model_dirs = [
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_5000",
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.004_data_7500"  # I like this model does well between -20 to 20
+    ]
 
     for counter, model_path in enumerate(model_dirs):
         # load model weights
         model = tf.keras.models.load_model(filepath=model_path)
-        #
-        # model = get_pendulum_tf_model_1_cross_x_models(hidden_neurons=64,
-        #                                                which_model=1)
 
         # loop for theta
         thetas = np.arange(-45, 45, 5)
@@ -311,23 +485,37 @@ def _plot_pendulum_state_evolution(dir_path,
     observation = init_state
     # col = stat diff # row = time step
     state_diff = np.zeros(shape=(rollout, observation.shape[1]))
+    max_steps = 0
     for step in range(rollout):
         # roll out
         next_state = model.predict(observation)
         # next_state = akash_model.predict(observation)
         # state_diff[step] = abs(next_state - observation)
         state_diff[step] = next_state
+
+        if observation.shape[1] == 3:
+            if next_state[0, 2] <= 0.1 or next_state[0, 2] >= 2.0:
+                max_steps = step
+                break
+
         observation = next_state
 
     # add function to plot in matplotlib
-    animate_nn_behavior(state_diff)
+    # animate_nn_behavior(state_diff)
 
     # ylabels: list = [r"$\Delta x$", r"$\Delta y$", r"$\Delta \dot{\theta}$"]
-    ylabels: list = [r"$x$", r"$y$", r"$\dot{\theta}$"]
+    # ylabels: list = [r"$x$", r"$y$", r"$\dot{\theta}$"]
+    if observation.shape[1] == 2:
+        ylabels: list = [r"$\theta$", r"$\dot{\theta}$"]
+    elif observation.shape[1] == 3:
+        ylabels: list = [r"$\theta$", r"$\dot{\theta}$", r"$r$"]
+    else:
+        print("Invalid system dimension length for Pendulum System")
+        sys.exit(-1)
 
     for ax_id in range(state_diff.shape[1]):
         # fig_axs[ax_id].plot(state_diff[:, ax_id], color_scheme[ax_id])
-        fig_axs[ax_id].plot(state_diff[:, ax_id], color, label=legend)
+        fig_axs[ax_id].plot(state_diff[:max_steps, ax_id], color, label=legend)
         fig_axs[ax_id].set(xlabel='time-step', ylabel=ylabels[ax_id])
         fig_axs[ax_id].legend(loc='best')
 
@@ -343,29 +531,48 @@ def _plot_pendulum_state_evolution(dir_path,
 
 
 def compare_pendulum_models_stability(fig_axs,
+                                      system_dimension: int,
                                       color,
                                       legend,
                                       init_state=None,
                                       use_akashs_model: bool = False,
                                       model_dir_path: str = '',
                                       use_multiple_models: bool = False):
-    state_space_dim = 3
+    state_space_dim = system_dimension
     if isinstance(init_state, type(None)):
         mu, sigma = 0, 0.1  # mean and standard deviation
         np.random.seed(2)
         init_state = np.random.normal(mu, sigma, size=(state_space_dim,))
 
     if use_multiple_models:
+        # model_dirs = [
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_5000", # - only good in one region of thetadot
+        #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_7500", # - kinda blows up at -1.0 but overall performance is good
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_10000", - blows up
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.01_data_2500", # - kinda blows up at 1.0
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.001_data_2500", # blows up at 1.0
+        #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.0015_data_5000", #- only good in one region of thetadot
+        # ]
+        # NEW 2d pendulum models
+        # model_dirs = [
+        #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",
+        #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_5000",
+        #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
+        #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.004_data_7500"
+        #     # I like this model does well between -20 to 20
+        # ]
+
+        # NEW 3d pendulum models
         model_dirs = [
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_2500",
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_5000", # - only good in one region of thetadot
-            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.01_data_7500",
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_7500", # - kinda blows up at -1.0 but overall performance is good
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.0015_data_10000", - blows up
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.01_data_2500", # - kinda blows up at 1.0
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.001_data_2500", # blows up at 1.0
-            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_128_loss_0.0015_data_5000", #- only good in one region of thetadot
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.01_data_5000",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.01_data_10000",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.5_data_7500",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.4_data_7500",
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.3_data_7500" # - best 3d pendulum model
         ]
+
     else:
         if model_dir_path is '':
             print("***********************************************************************************")
@@ -385,7 +592,7 @@ def compare_pendulum_models_stability(fig_axs,
                                        color=color,
                                        legend=legend,
                                        xyloc=xytests[counter],
-                                       rollout=200)
+                                       rollout=100)
 
     fig_axs[0].text(0.8, 1.2,
                     "Init State:" + ', '.join(["'{:.{}f}'".format(_s, 5) for _s in init_state]),
@@ -394,5 +601,120 @@ def compare_pendulum_models_stability(fig_axs,
                     transform=fig_axs[0].transAxes)
 
     # plt.show(block=True)
+
+
+def generate_2d_pendulum_data():
+    """
+    A generate 2d pendulum data
+
+    1. theta(t+1): theta(t) + thetadot(t) deltat + ((3g/2l)*(sin(theta(t)) deltat)) + ((3/ml**2)*(u*delta_t**2))
+    2. thetadot(t+1): thetadot(t) + (3g/2l)*(sin(thetat)deltat) + ((3/ml**2)*(u*deltat))
+    :return:
+    """
+
+    num_trajectories = 10000
+    filename = f'/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/' \
+               f'data/pendulum_v0_{num_trajectories}.txt'
+
+    ''' Create a file tp dump the data in csv format '''
+    with open(filename, 'w+') as file_handle:
+        file_handle.write('"ip1","ip2","op1","op2"')
+        file_handle.write('\n')
+        file_handle.close()
+
+    '''Generate Synthetic Data '''
+    print("Performing rollouts ")
+    file_handle = open(filename, 'a')
+
+    pendulum = gym.make("Pendulum-v0")
+
+    # define pendulum constants
+    pendulum_dt = pendulum.dt
+    pendulum_g = pendulum.g
+    pendulum_l = pendulum.l
+    pendulum_m = pendulum.m
+    pendulum_max_speed = pendulum.max_speed
+
+    pendulum_agent = PendulumAgent()
+
+    for i in range(num_trajectories):
+        # sample a theta and theta dot value
+        th_ip = np.random.uniform(low=-math.pi, high=math.pi)  # theta in radians
+        th_dot_ip = np.random.uniform(low=-1, high=1)
+
+        # Convert the theta to x & y and ge the control value from it.
+        _3d_state = get_3d_coords_from_2_coords(np.array([th_ip, th_dot_ip]))
+        control = pendulum_agent.decide(_3d_state)[0]   # you don't have to clip it as it is always between [-2, 2]
+
+        th_dot_op = th_dot_ip + (((3 * pendulum_g) / (2 * pendulum_l ** 2)) * (math.sin(th_ip) * pendulum_dt)) \
+                    + ((3 / (pendulum_m * pendulum_l ** 2)) * (control * pendulum_dt))
+
+        th_dot_op = np.clip(th_dot_op, -pendulum_max_speed, pendulum_max_speed)
+
+        th_op = th_ip + (th_dot_op * pendulum_dt)
+
+        file_handle.write(
+            f'"{th_ip}","{th_dot_ip}","{th_op}","{th_dot_op}"')
+        file_handle.write('\n')
+
+    file_handle.close()
+
+
+def generate_3d_pendulum_data():
+    """
+    A generate 2d pendulum data
+
+    1. theta(t+1): theta(t) + thetadot(t) deltat + ((3g/2l)*(sin(theta(t)) deltat)) + ((3/ml**2)*(u*delta_t**2))
+    2. thetadot(t+1): thetadot(t) + (3g/2l)*(sin(thetat)deltat) + ((3/ml**2)*(u*deltat))
+    3. here l is also an input of variable length
+    :return:
+    """
+
+    num_trajectories = 10000
+    filename = f'/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/' \
+               f'data/pendulum_v0_3d_{num_trajectories}.txt'
+
+    ''' Create a file tp dump the data in csv format '''
+    with open(filename, 'w+') as file_handle:
+        file_handle.write('"ip1","ip2","ip3","op1","op2","op3"')
+        file_handle.write('\n')
+        file_handle.close()
+
+    '''Generate Synthetic Data '''
+    print("Performing rollouts ")
+    file_handle = open(filename, 'a')
+
+    pendulum = gym.make("Pendulum-v0")
+
+    # define pendulum constants
+    pendulum_dt = pendulum.dt
+    pendulum_g = pendulum.g
+    pendulum_m = pendulum.m
+    pendulum_max_speed = pendulum.max_speed
+
+    pendulum_agent = PendulumAgent()
+
+    for i in range(num_trajectories):
+        # sample a theta and theta dot value
+        th_ip = np.random.uniform(low=-math.pi, high=math.pi)  # theta in radians
+        th_dot_ip = np.random.uniform(low=-1, high=1)  # thetadot in radians/s
+        pendulum_l = np.random.uniform(low=0.1, high=1)  # l in m
+
+        # Convert the theta to x & y and ge the control value from it.
+        _3d_state = get_3d_coords_from_2_coords(np.array([th_ip, th_dot_ip]), radius=pendulum_l)
+        control = pendulum_agent.decide(_3d_state)[0]   # you don't have to clip it as it is always between [-2, 2]
+
+        th_dot_op = th_dot_ip + (((3 * pendulum_g) / (2 * pendulum_l ** 2)) * (math.sin(th_ip) * pendulum_dt)) \
+                    + ((3 / (pendulum_m * pendulum_l ** 2)) * (control * pendulum_dt))
+
+        th_dot_op = np.clip(th_dot_op, -pendulum_max_speed, pendulum_max_speed)
+
+        th_op = th_ip + (th_dot_op * pendulum_dt)
+
+        file_handle.write(
+            f'"{th_ip}","{th_dot_ip}","{pendulum_l}","{th_op}","{th_dot_op}","{pendulum_l}"')
+        file_handle.write('\n')
+
+    file_handle.close()
 
 

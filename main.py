@@ -19,33 +19,14 @@ from tf_husky_plotting_utls import plot_trained_husky_w_mean_and_std, plot_train
 from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models
 
 from tf_pendulum_utls import simulate_learned_pendulum_model, simulate_pendulum,\
-    compare_pendulum_models_stability, plot_3d_data, plot_delta_models_fixed_init_state, plot_delta_model_vs_deg_vs_thdot
+    compare_pendulum_models_stability, plot_3d_data, plot_delta_models_fixed_init_state,\
+    plot_delta_model_vs_deg_vs_thdot, generate_2d_pendulum_data, plot_2d_pendulum_data, generate_3d_pendulum_data,\
+    simulate_new_3d_pendulum_behavior
+
+from gen_utls import deprecated
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-
-class PendulumAgent:
-    def decide(self, observation):
-        x, y, angle_velocity = observation
-        flip = (y < 0.)
-        if flip:
-            y *= -1. # now y >= 0
-            angle_velocity *= -1.
-        angle = np.arcsin(y)
-        if x < 0.:
-            angle = np.pi - angle
-        if (angle < -0.3 * angle_velocity) or \
-                (angle > 0.03 * (angle_velocity - 2.5) ** 2. + 1.
-                 and angle < 0.15 * (angle_velocity + 3.) ** 2. + 2.):
-            force = 2.
-        else:
-            force = -2.
-        if flip:
-            force *= -1.
-        action = np.array([force,])
-        # action = force
-        return action
 
 
 class Agent:
@@ -177,6 +158,7 @@ def generate_data(print_flag: bool = False):
     file_handle.close()
 
 
+@deprecated
 def generate_data_pendulum():
     """
     ## Observation Space
@@ -747,16 +729,23 @@ def plot_learned_sys_phase_portrait(scale=1.0):
 
 
 def _dump_model_weights():
+    # pendulum 2d model
+    # pendulum_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.004_data_7500"
+
+    # pendulum 3d model
+    pendulum_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.3_data_7500"
+    imitation_pendulum_model = tf.keras.models.load_model(pendulum_dir)
+
     # Husky Model 5
     # husky_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/husky_Models/new_husky256_5/variables/variables"
     # imitation_husky_model = tf.keras.models.load_model(husky_dir)
-    tf_model_model_5 = _get_husky_tf_model_1_cross_x_model_5(hidden_neurons=256)
+    # tf_model_model_5 = _get_husky_tf_model_1_cross_x_model_5(hidden_neurons=256)
 
-    tf_model_model_5.summary()
-    weight_list = tf_model_model_5.get_weights()
-    tf_model_model_5.save("husky_model_5.h5")
+    imitation_pendulum_model.summary()
+    weight_list = imitation_pendulum_model.get_weights()
+    imitation_pendulum_model.save("pendulum_model_3d_neurons_64_loss_0.3_data_7500.h5")
 
-    cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"  # model5
+    # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"  # model5
     # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000" # model4
 
 
@@ -767,7 +756,7 @@ def _dump_model_weights():
     # cartpole_model.summary()
     # weight_list = cartpole_model.get_weights()
     # dump weights using numpy
-    with open('husky_model_5.npy', 'wb') as f:
+    with open('pendulum_model_3d_neurons_64_loss_0.3_data_7500.npy', 'wb') as f:
         np.save(f, weight_list)
 
     # cartpole_model.save("husky_model_5.h5")
@@ -777,12 +766,12 @@ if __name__ == "__main__":
     record_flag: bool = False
     simuale_rl: bool = False
     simulate_nn: bool = False
-    save_nn: bool = False
+    save_nn: bool = True
     generate_data_flag: bool = False
     generate_pendulum_data_flag: bool = False
     plot_pendulum_data_flag: bool = False
     plot_husky: bool = False
-    plot_pendulum: bool = True
+    plot_pendulum: bool = False
     simulate_pendulum_flag: bool = False
 
     # _plot_state_evolution()
@@ -801,8 +790,9 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     elif plot_pendulum:
-        plot_delta_models_fixed_init_state()
-        # plot_delta_model_vs_deg_vs_thdot(save_flag=False)
+        # plot_delta_models_fixed_init_state(system_dimension=3)
+        plot_delta_model_vs_deg_vs_thdot(save_flag=False,
+                                         system_dimension=3)
 
         sys.exit(-1)
 
@@ -839,10 +829,12 @@ if __name__ == "__main__":
 
     elif plot_pendulum_data_flag:
         plot_3d_data()
+        # plot_2d_pendulum_data()
 
     elif simulate_pendulum_flag:
-        pendulum = gym.make("Pendulum-v0")
-        simulate_pendulum(pendulum)
+        # pendulum = gym.make("Pendulum-v0")
+        # simulate_pendulum(pendulum)
+        simulate_new_3d_pendulum_behavior(init_state=np.array([0.0175, 0, 0.5]))
 
     elif save_nn:
         _dump_model_weights()
@@ -881,6 +873,8 @@ if __name__ == "__main__":
         generate_data()
 
     elif generate_pendulum_data_flag:
-        generate_data_pendulum()
+        # generate_data_pendulum()
+        # generate_2d_pendulum_data()
+        generate_3d_pendulum_data()
 
 
