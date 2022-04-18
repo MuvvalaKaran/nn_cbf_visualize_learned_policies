@@ -352,12 +352,14 @@ def evolve_according_to_controller(partitions,
     elif num_controllers == 1 and curr_state.shape[0] == 2:
         if cube_idx == 109:
             poly_coeff = control_coeff_matrix[cube_idx]
+            u = 0.1
         elif cube_idx == 210:
             poly_coeff = control_coeff_matrix[cube_idx]
+            u = 0.1
         else:
             print("ERROR, no controller coeff available for any other hypercubes")
-            exit()
-
+            # exit()
+            u = 0.0
         # gamma_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
         # gamma_poly_value = gamma_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
         #
@@ -372,7 +374,7 @@ def evolve_according_to_controller(partitions,
         # new_state[0] = curr_state[0] + u_1
         # new_state[0] = curr_state[0] + u_2
 
-        u = 0.1
+        # u = 0.1
         new_state[0] = next_state[0] + u
         new_state[1] = next_state[1] + u
 
@@ -466,9 +468,6 @@ def create_new_controller(gamma_poly_val: float,
     
     return u_val_1, u_val_2
     
-    
-    
-
 
 # function to plot the learned NN's dynamics
 def plot_learned_sys_phase_portrait(input_data, trained_nn_model, scale=1.0):
