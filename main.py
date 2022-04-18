@@ -446,7 +446,6 @@ def compare_models_w_rl_agent(init_state = None):
                                         legend=legend_list[counter],
                                         xyloc=xytests[counter])
 
-
     # add rl trajectory to the plot
     observation = init_state
     rl_op = np.zeros(shape=(500, 4))
@@ -766,10 +765,10 @@ if __name__ == "__main__":
     record_flag: bool = False
     simuale_rl: bool = False
     simulate_nn: bool = False
-    save_nn: bool = True
+    save_nn: bool = False
     generate_data_flag: bool = False
     generate_pendulum_data_flag: bool = False
-    plot_pendulum_data_flag: bool = False
+    plot_pendulum_data_flag: bool = True
     plot_husky: bool = False
     plot_pendulum: bool = False
     simulate_pendulum_flag: bool = False
@@ -779,7 +778,7 @@ if __name__ == "__main__":
     # pendulum = gym.make("Pendulum-v0")
     # init_state = pendulum.reset()
     # compare_models_stability(init_state=init_state)
-    # compare_models_w_rl_agent(init_state=init_state)
+    compare_models_w_rl_agent(init_state=init_state)
     # plot_4d_data()
     # sys.exit(-1)
 
@@ -828,8 +827,8 @@ if __name__ == "__main__":
         # plot_pendulum_models()
 
     elif plot_pendulum_data_flag:
-        plot_3d_data()
-        # plot_2d_pendulum_data()
+        # plot_3d_data()
+        plot_2d_pendulum_data()
 
     elif simulate_pendulum_flag:
         # pendulum = gym.make("Pendulum-v0")
