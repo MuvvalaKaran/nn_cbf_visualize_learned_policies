@@ -23,6 +23,8 @@ from tf_pendulum_utls import simulate_learned_pendulum_model, simulate_pendulum,
     plot_delta_model_vs_deg_vs_thdot, generate_2d_pendulum_data, plot_2d_pendulum_data, generate_3d_pendulum_data,\
     simulate_new_3d_pendulum_behavior
 
+from cartpole_utls import get_cartpole_tf_model_2_cross_x_models, get_cartpole_tf_model_3_cross_x_models
+
 from gen_utls import deprecated
 
 import os
@@ -115,7 +117,7 @@ def generate_data(print_flag: bool = False):
     # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"
     # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000"
 
-    filename = '/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/cartpole_v0_14000.txt'
+    filename = '/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/cartpole_v0_100000.txt'
 
     ''' Create a file tp dump the data in csv format '''
     with open(filename, 'w') as file_handle:
@@ -136,7 +138,7 @@ def generate_data(print_flag: bool = False):
     # high_b = 10 + 0.001
     # low_a = -10
 
-    num_trajectories = 14000
+    num_trajectories = 100000
     _alpha = 0.5
 
     agent = Agent()
@@ -149,7 +151,7 @@ def generate_data(print_flag: bool = False):
         ip_prime = get_one_step_op_cartpole(init_state=ip, env=cartpole, agent=agent)
         # old method
         # op_state = (_alpha * ((ip_prime - ip) /np.linalg.norm(ip_prime - ip))) + ip
-        # new method s -> del s'
+        # new method s -> del s' - learning drift of the system
         op_state = ip_prime - ip
 
         file_handle.write(f'"{ip[0]}","{ip[1]}","{ip[2]}","{ip[3]}","{op_state[0]}","{op_state[1]}","{op_state[2]}","{op_state[3]}"')
@@ -210,38 +212,65 @@ def generate_data_pendulum():
     file_handle.close()
 
 
-
 def _simulate_learned_cartpole_model(gym_env,
-                                     init_state: np.array = np.array([-1.0, 0.25, -2*0.035, 0.2]),
+                                     init_state: np.array = np.array([0.0, 0., -2*0.017, 0.0]),
                                      record_flag: bool = False):
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.01_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_25000",
+    _hidden_layer: int = 3
+    if _hidden_layer == 2:
+        # 2 layer cartpole models
+        model_dirs = [
+            # fair performance, not too frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_5000/variables/variables",
+            # fair performance, not too frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_25000/variables/variables",
+            # Very good model - stays within the state space
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_50000/variables/variables",
+            # not good performance - smooth behavior
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_0001_loss/cartpole_model_2_cross_128_loss_0.0001_data_5000/variables/variables",
+            # not good performance - relative more dynamic behavior
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_0001_loss/cartpole_model_2_cross_128_loss_0.0001_data_25000/variables/variables",
+            # Very good model, only second to the above model and smooth; almost stays within the state space
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_0001_loss/cartpole_model_2_cross_128_loss_0.0001_data_50000/variables/variables",
+            # fair performance, not too frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/cartpole_model_2_cross_128_loss_0.0003_data_100000/variables/variables",
+            # fair performance, relative more dynamic behavior
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/cartpole_model_2_cross_128_loss_0.0005_data_50000/variables/variables"
+        ]
 
+        # cartpole_model = tf.keras.models.load_model(cartpole_dir)
+        cartpole_model = get_cartpole_tf_model_2_cross_x_models(hidden_neurons=128,
+                                                                variables_path=model_dirs[0],
+                                                                print_flag=True)
 
-    # 128 ones
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000"
+    elif _hidden_layer == 3:
+        # 3 layer cartpole models
+        model_dirs = [
+            # goes outside of bounds, smooth behavior
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+            "cartpole_model_3_cross_128_loss_0.001_data_25000/variables/variables",
+            # goes outside of bounds, slightly frantic - not a good representation of the undelying system
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+            # "cartpole_model_3_cross_128_loss_0.001_data_50000/variables/variables",
+            # goes outside of bounds, very frantic outside of training set - not a good representation of the undelying system
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+            # "cartpole_model_3_cross_128_loss_0.0001_data_25000/variables/variables",
+            # goes outside of bounds most of the times, slightly frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+            # "cartpole_model_3_cross_128_loss_0.0001_data_50000/variables/variables",
+            # goes outside of bounds most of the times, slightly frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/"
+            # "0_0001_loss/cartpole_model_3_cross_128_loss_0.0001_data_75000/variables/variables",
+            # goes outside of bounds most of the times, slightly frantic
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+            # "cartpole_model_3_cross_128_loss_0.0001_data_100000/variables/variables"
+        ]
 
-    # cartpole_dir = '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model'
+        # cartpole_model = tf.keras.models.load_model(cartpole_dir)
+        cartpole_model = get_cartpole_tf_model_3_cross_x_models(hidden_neurons=128,
+                                                                variables_path=model_dirs[0],
+                                                                print_flag=True)
 
-    # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_25000"
-    cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"
-    # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000"
-
-    ## MODEL 3
-    # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/trained_cartpole_2500_1_cross_8_loss_0001.h5"
-
-    # cartpole_dir = '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_2500_1_cross_16_loss_001'
-
-    # MODELS w REGULARIZATION
-    model_dirs = [
-        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000",
-        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.025_data_25000"
-        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.03_data_25000"
-    ]
-
-    cartpole_model = tf.keras.models.load_model(cartpole_dir)
+    # 2 layer models learned drift - need to currt state to del x
     gym_env.reset()
     gym_env.render()
 
@@ -252,7 +281,12 @@ def _simulate_learned_cartpole_model(gym_env,
     curr_state = init_state.reshape(1, 4)
     for steps in range(500):
         # get next state
-        next_state = cartpole_model.predict(curr_state)
+        # for 1 layer
+        # next_state = cartpole_model.predict(curr_state)
+
+        # for 2+ layers that are trained over drift
+        delta = cartpole_model.predict(curr_state)
+        next_state = delta + curr_state
         gym_env.unwrapped.state = next_state.reshape(4, )
         if record_flag:
           vid.capture_frame()
@@ -263,7 +297,7 @@ def _simulate_learned_cartpole_model(gym_env,
 
 
 def compare_models_stability(init_state = None):
-    state_space_dim = 3
+    state_space_dim = 4
     if isinstance(init_state, type(None)):
         mu, sigma = 0, 0.1  # mean and standard deviation
         np.random.seed(2)
@@ -272,47 +306,36 @@ def compare_models_stability(init_state = None):
     fig, axs = plt.subplots(state_space_dim)
     fig.suptitle('Cartpole Stabilization - only models')
 
-
-    ###################### OLD MODELS with no regularization
-    # Models with 8/16 neurons
-    # model_dirs = ['/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/trained_cartpole.h5',
-    #               '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/trained_cartpole_2500_1_cross_8_loss_0001.h5',
-    #               '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_2500_1_cross_16_loss_001']
-
-    # # Models with 32 neurons
-    # model_dirs = [
-    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_25000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_250000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_2500000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_001",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0001"]
-    #
-    # # Models with 64 neurons
-    # model_dirs = [
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.01_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_25000",
-    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_250000",
-    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_2500000"
-    # ]
-    #
-    # # Models with 128 neurons
-    # model_dirs = [
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500",
-    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_25000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_25000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_250000",
-    # # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_250000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500000",
-    # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000"
-    # ]
-
-    ###################### NEW MODELS with regularization
+    ###################### NEW MODELS with deeper layers ######################
+    # 2 layer models
     model_dirs=[
-    "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000",
-    "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.025_data_25000",
-        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.03_data_25000"
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_5000/variables/variables",
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_25000/variables/variables",
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_50000/variables/variables",
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_0001_loss/cartpole_model_2_cross_128_loss_0.0001_data_50000/variables/variables",
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/cartpole_model_2_cross_128_loss_0.0005_data_50000/variables/variables"
+    ]
+
+    # 3 layer models
+    model_dirs = [
+        # goes outside of bounds, smooth behavior
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.001_data_25000/variables/variables",
+        # goes outside of bounds, slightly frantic
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.001_data_50000/variables/variables",
+        # goes outside of bounds, very frantic outside of training set
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.0001_data_25000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        "cartpole_model_3_cross_128_loss_0.0001_data_50000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic - finalize this model for computing bounds
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/"
+        "0_0001_loss/cartpole_model_3_cross_128_loss_0.0001_data_75000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        "cartpole_model_3_cross_128_loss_0.0001_data_100000/variables/variables"
     ]
 
 
@@ -384,43 +407,37 @@ def compare_models_w_rl_agent(init_state = None):
     fig, axs = plt.subplots(state_space_dim)
     fig.suptitle('Cartpole Stabilization - models vs rl agent')
 
-    ###################### OLD MODELS with no regularization
-    # # model_dirs = ['/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/trained_cartpole.h5',
-    # #               '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/trained_cartpole_2500_1_cross_8_loss_0001.h5',
-    # #               '/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_2500_1_cross_16_loss_001']
-    #
+    ###################### NEW MODELS with deeper layers ######################33
+    # 2 layer models
     # model_dirs = [
-    #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_25000",
-    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_250000",
-    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0.001_data_2500000",
-    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_001",
-    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_32_loss_0001"]
-    #
-    # # model_dirs = [
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.01_data_2500",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_2500",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_25000",
-    # #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_250000"
-    # #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.001_data_2500000"
-    # # ]
-    #
-    # # Models with 128 neurons
-    # # model_dirs = [
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500",
-    # #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_25000",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_25000",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_250000",
-    # #     # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_250000",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500000",
-    # #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000"
-    # # ]
+    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_5000/variables/variables",
+    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_25000/variables/variables",
+    #     # choose this to compute alpha-crown bounds
+    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_001_loss/cartpole_model_2_cross_128_loss_0.001_data_50000/variables/variables",
+    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/0_0001_loss/cartpole_model_2_cross_128_loss_0.0001_data_50000/variables/variables",
+    #     "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/2_layer/cartpole_model_2_cross_128_loss_0.0005_data_50000/variables/variables"
+    # ]
 
-    ###################### NEW MODELS with regularization
+    # 3 layer models
     model_dirs = [
-        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000",
-        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.025_data_25000",
-        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_64_loss_0.03_data_25000"
+        # goes outside of bounds, smooth behavior
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.001_data_25000/variables/variables",
+        # goes outside of bounds, slightly frantic
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.001_data_50000/variables/variables",
+        # goes outside of bounds, very frantic outside of training set
+        # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        # "cartpole_model_3_cross_128_loss_0.0001_data_25000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic - good representation of undelying system
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        "cartpole_model_3_cross_128_loss_0.0001_data_50000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/"
+        "0_0001_loss/cartpole_model_3_cross_128_loss_0.0001_data_75000/variables/variables",
+        # goes outside of bounds most of the times, slightly frantic
+        "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_0001_loss/"
+        "cartpole_model_3_cross_128_loss_0.0001_data_100000/variables/variables"
     ]
 
     color_scheme: list = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red',  'tab:brown', 'tab:cyan', 'tab:purple']
@@ -525,15 +542,29 @@ def _plot_state_evolution_w_rlagent(dir_path,
     A helper function to plot the evolution to changge in each state in the cartpole model
     :return:
     """
+    # for 1 layer models
+    # cartpole_model = tf.keras.models.load_model(dir_path)
 
-    cartpole_model = tf.keras.models.load_model(dir_path)
+    # for 2+ layer models
+    # cartpole_model = get_cartpole_tf_model_2_cross_x_models(hidden_neurons=128,
+    #                                                         variables_path=dir_path,
+    #                                                         print_flag=True)
+
+    cartpole_model = get_cartpole_tf_model_3_cross_x_models(hidden_neurons=128,
+                                                            variables_path=dir_path,
+                                                            print_flag=True)
+
     observation = init_state
     # col = stat diff # row = time step
     states = np.zeros(shape=(500, 4))
     rl_op = np.zeros(shape=(500, 4))
     for step in range(500):
         # get next state from NN
-        next_state = cartpole_model.predict(observation)
+        # next_state = cartpole_model.predict(observation)
+
+        # for 2+ layers that are trained over drift
+        delta = cartpole_model.predict(observation)
+        next_state = delta + observation
         states[step] = next_state
         observation = next_state
 
@@ -561,14 +592,28 @@ def _plot_state_evolution(dir_path, init_state, fig_axs, color, legend, xyloc: t
     A helper function to plot the evolution to chnage in each state in the cartpole model
     :return:
     """
-    cartpole_model = tf.keras.models.load_model(dir_path)
+    # for 1 layer models
+    # cartpole_model = tf.keras.models.load_model(dir_path)
+
+    # for 2+ layer models
+    # cartpole_model = get_cartpole_tf_model_2_cross_x_models(hidden_neurons=128,
+    #                                                         variables_path=dir_path,
+    #                                                         print_flag=True)
+
+    cartpole_model = get_cartpole_tf_model_3_cross_x_models(hidden_neurons=128,
+                                                            variables_path=dir_path,
+                                                            print_flag=True)
 
     observation = init_state
     # col = stat diff # row = time step
     state_diff = np.zeros(shape=(rollout, observation.shape[1]))
     for step in range(rollout):
-        # roll out
-        next_state = cartpole_model.predict(observation)
+        # roll out for 1 layer
+        # next_state = cartpole_model.predict(observation)
+
+        # for 2+ layers that are trained over drift
+        delta = cartpole_model.predict(observation)
+        next_state = delta + observation
         state_diff[step] = abs(next_state - observation)
         observation = next_state
 
@@ -768,13 +813,13 @@ if __name__ == "__main__":
     save_nn: bool = False
     generate_data_flag: bool = False
     generate_pendulum_data_flag: bool = False
-    plot_pendulum_data_flag: bool = True
+    plot_pendulum_data_flag: bool = False
     plot_husky: bool = False
     plot_pendulum: bool = False
     simulate_pendulum_flag: bool = False
 
     # _plot_state_evolution()
-    # init_state = np.array([0, 0, 0.035, 0])
+    init_state = np.array([0, 0, 3*0.017, 0])
     # pendulum = gym.make("Pendulum-v0")
     # init_state = pendulum.reset()
     # compare_models_stability(init_state=init_state)
@@ -873,7 +918,7 @@ if __name__ == "__main__":
 
     elif generate_pendulum_data_flag:
         # generate_data_pendulum()
-        # generate_2d_pendulum_data()
-        generate_3d_pendulum_data()
+        generate_2d_pendulum_data()
+        # generate_3d_pendulum_data()
 
 

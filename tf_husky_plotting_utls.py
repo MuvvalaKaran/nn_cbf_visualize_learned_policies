@@ -4,7 +4,8 @@ import numpy as np
 
 from tf_husky_models import get_trained_husky_models, _get_husky_tf_model_3_cross_x_model_3,\
     _get_husky_tf_model_1_cross_x_model_6, _get_husky_tf_model_1_cross_x_model_5,\
-    _get_husky_tf_model_1_cross_x_model_8, _get_husky_tf_model_1_cross_x_model_9
+    _get_husky_tf_model_1_cross_x_model_8, _get_husky_tf_model_1_cross_x_model_9,\
+    _get_husky_tf_model_2_cross_x_model_
 
 def plot_trained_husky_w_no_mean_and_std(save_figs: bool = False):
     """
@@ -45,6 +46,15 @@ def plot_trained_husky_w_no_mean_and_std(save_figs: bool = False):
         tf_model_model_6 = _get_husky_tf_model_1_cross_x_model_6(hidden_neurons=256)
         tf_model_model_8 = _get_husky_tf_model_1_cross_x_model_8(hidden_neurons=256)
         tf_model_model_9 = _get_husky_tf_model_1_cross_x_model_9(hidden_neurons=256)
+        tf_2_layer_model_1 = _get_husky_tf_model_2_cross_x_model_(hidden_neurons=256,
+                                                                  husky_dir_path="/home/karan/Documents/research/" \
+                                                                                 "nn_veri_w_crown/rl_train_agent/" \
+                     "husky_2_layer_models/husky_256_256_1/variables/variables")
+        tf_2_layer_model_2 = _get_husky_tf_model_2_cross_x_model_(hidden_neurons=256,
+                                                                  husky_dir_path="/home/karan/Documents/research/" \
+                                                                                 "nn_veri_w_crown/rl_train_agent/" \
+                                                                                 "husky_2_layer_models/"
+                                                                                 "husky_256_256_2/variables/variables")
 
         _states_model_3 = np.zeros(shape=(roll_out_steps, state_space_dim))
         _states_model_5 = np.zeros(shape=(roll_out_steps, state_space_dim))

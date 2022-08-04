@@ -10,8 +10,9 @@ import matplotlib.animation as animation
 from scipy.io import loadmat
 from gen_utls import create_hypercube_idx_dict, evolve_according_to_controller, \
     postprocess_partition_dump, get_hypercube, plot_learned_sys_phase_portrait
-from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models
+from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models, get_2d_pendulum_tf_model_3_cross_x_models
 from gym.wrappers.monitoring import video_recorder
+from tf_toy_system_utls import plot_2d_toy_sys_from_data_file
 
 
 import os
@@ -616,7 +617,7 @@ def generate_2d_pendulum_data():
     :return:
     """
 
-    num_trajectories = 10000
+    num_trajectories = 50000
     filename = f'/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/' \
                f'data/pendulum_v0_{num_trajectories}.txt'
 
@@ -727,14 +728,14 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
                                   rollout: int = 100,
                                   num_controllers: int = 2,
                                   print_flag: bool = False,
-                                  use_controller: bool = False,):
+                                  use_controller: bool = False,
+                                  visulaize_traj: bool = False,
+                                  record_flag: bool = False,
+                                  simulate: bool = False):
     """
     A helper function to plot the evolution of the states of 2d and 3d pendulum along with the additive controller
     :return:
     """
-
-    cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/" \
-                   "cartpole_model_1_cross_128_loss_0.01_data_2500"
 
     # load the file
     control_dict = loadmat(mat_file_dir)
@@ -748,35 +749,125 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
 
         control_coeff_matrix = (control_coeff_matrix1, control_coeff_matrix2)
     else:
-        control_coeff_matrix = control_dict.get('control_matrix1')
+        # control_coeff_matrix = control_dict.get('control_matrix1')
+        # updated to matrix name to  control array
+        control_coeff_matrix = control_dict.get('array_control')
 
-    partitions, partition_dim_list = get_hypercube(eps=eps, state_space=state_space, n=s_dim, print_flag=print_flag)
+    partitions, partition_dim_list = get_hypercube(eps=eps.flatten(), state_space=state_space, n=s_dim, print_flag=print_flag)
+
+    # get partitions to create the look up dictionary
+    partition_from_mat = control_dict.get('partitions')
+
+    # process it before creating the dict
+    processed_partitions = postprocess_partition_dump(partition_from_mat)
 
     # create the hypercube lookup dict
-    hypercube_idx_dict = create_hypercube_idx_dict(partitions)
+    hypercube_idx_dict = create_hypercube_idx_dict(processed_partitions)
 
+    # tf_pendulum_models = tf.keras.models.load_model(cartpole_dir)
+    tf_pendulum_models = get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons=64,
+                                                                   var_dir_path="/home/karan/Documents/research/"
+                                                                                "nn_veri_w_crown/rl_train_agent/" \
+                                                                                "new_pendulum_imitation_models/"
+                                                                                "2d_sys/3_layer/64_neurons/" \
+                                    "pendulum_model_2d_neurons_3_cross_64_loss_0.001_data_50000/variables/variables",
+                                                                   input_neurons=2,
+                                                                   output_neurons=2,
+                                                                   print_flag=True)
+
+    # start simulation - keep track of states
     state_evolution = np.zeros(shape=(rollout + 1, s_dim))
-    curr_state = system_state.reshape(1, 4)
+    control_evolution = np.zeros(shape=(rollout, num_controllers))
+    curr_state = system_state.reshape(1, 2)
     state_evolution[0] = curr_state
 
-    tf_pendulum_models = tf.keras.models.load_model(cartpole_dir)
+    # rollout trajectory
+    if simulate:
+        pendulum_handle = gym.make("Pendulum-v0")
+        pendulum_handle.reset()
+        pendulum_handle.render()
+
+        if record_flag:
+            vid = video_recorder.VideoRecorder(pendulum_handle,
+                                               path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/'
+                                                    'cbf_videos/pendulum_cbf.mp4')
 
     for step in range(rollout):
         # get next state
         if use_controller:
-            # tmp_next_state = cartpole_model.predict(curr_state)
-            pass
+            tmp_next_state = tf_pendulum_models.predict(curr_state)
+            next_state = evolve_according_to_controller(partitions=processed_partitions,
+                                                        partition_dim_list=partition_dim_list,
+                                                        curr_state=curr_state,
+                                                        next_state=tmp_next_state,
+                                                        A_ub=None,
+                                                        A_lb=None,
+                                                        b_ub=None,
+                                                        b_lb=None,
+                                                        hypercube_idx_dict=hypercube_idx_dict,
+                                                        control_evolution=control_evolution,
+                                                        control_coeff_matrix=control_coeff_matrix,
+                                                        num_controllers=num_controllers,
+                                                        time_step=step,
+                                                        epsilon=eps[0, 0],
+                                                        print_flag=False)
+        else:
+            next_state = tf_pendulum_models.predict(curr_state)
+
+        state_evolution[step + 1] = next_state
+
+        if simulate:
+            pendulum_handle.unwrapped.state = next_state.reshape(2, )
+            if record_flag:
+                vid.capture_frame()
+            pendulum_handle.render()
+
+        curr_state = next_state.reshape(1, 2)
+
+    if simulate:
+        pendulum_handle.close()
+
+    if visulaize_traj:
+        fig, axs = plt.subplots(1)
+        fig.suptitle('2d system trajectory')
+
+        plt.plot(state_evolution[:, 0], state_evolution[:, 1], 'ro', linestyle='-.')
+        plt.show(block=True)
+    else:
+        plot_2d_toy_sys_from_data_file(data_array=state_evolution,
+                                       ylabels=[r"$\theta$ [rad]", r"$\dot{\theta}$ [rad/s]"],
+                                       # ylabels=['Control Mag'],
+                                       # title='Pendulum Model - Trajectory in each dimension',
+                                       plot_boundary=True,
+                                       # bdry_dict=dict({0: [-1, 1]})  # control min-max values for
+                                       bdry_dict=dict({0: [-math.pi/15, math.pi/15], 1: [-1, 1]})
+                                       )
+
+        # plot_from_data_file(state_evolution=state_evolution)
+        plot_2d_toy_sys_from_data_file(data_array=control_evolution,
+                                       # ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
+                                       ylabels=[r"$u1 $"],
+                                       # title='Cartpole Model - Trajectory in each dimension',
+                                       plot_boundary=False,
+                                       bdry_dict=dict({0: [-1, 1]})  # control min-max values for
+                                       )
 
 
 if __name__ == "__main__":
     pendulum_control_mat_file = ""
 
-    system_state = np.array([1e-8, 1e-8])  # 2d array
+    # system_state = np.array([1e-8, 1e-8])  # 2d array
+    # system_state = np.array([12*(math.pi/180), 0.6])  # 2d array
+    system_state = np.array([0.114, -0.3])  # 2d 3 layer pendulum worst hypercube
     # system_state = np.arrya([0, 0, 0]) # 3d array
 
     plot_pendulum_w_cbf_evolution(system_state=system_state,
-                                  mat_file_dir='',
-                                  rollout=100,
-                                  num_controllers=2,
+                                  mat_file_dir="/home/karan/Documents/research/nn_veri_w_crown/"
+                                               "rl_train_agent/pendulum_control_data/partition_data_120.mat",
+                                  rollout=1000,
+                                  num_controllers=1,
                                   print_flag=False,
-                                  use_controller=False)
+                                  use_controller=True,
+                                  visulaize_traj=False,
+                                  record_flag=True,
+                                  simulate=True)

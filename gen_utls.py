@@ -259,6 +259,8 @@ def evolve_according_to_controller(partitions,
                                    b_lb: np.array,
                                    control_coeff_matrix: Optional,
                                    time_step: int = 0,
+                                   epsilon = 0,
+                                   use_husky: bool = False,
                                    print_flag: bool = False) -> np.array:
     """
     A helper function to get next state as per the control polynomial
@@ -280,7 +282,7 @@ def evolve_according_to_controller(partitions,
     if len(next_state.shape) == 2:
         next_state = next_state.flatten()
 
-    new_state = np.copy(curr_state)
+    new_state = np.copy(next_state)
     cube_idx = look_up_partition(system_hypercubes=partitions,
                                  system_dim_partitions=partition_dim_list,
                                  system_state=curr_state,
@@ -293,90 +295,159 @@ def evolve_according_to_controller(partitions,
         # sys.exit(-2)
         return new_state
 
-    if num_controllers == 2 and curr_state.shape[0] == 4:
-        # get the control value
-        poly_coeff_1 = control_coeff_matrix[0][cube_idx]
-        poly_coeff_2 = control_coeff_matrix[1][cube_idx]
-        u1_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_1)
-        u2_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_2)
-        # x - cart position
-        # y - dx - cart velocity
-        # z - theta - cart pole angle
-        # a - dtheta - cart pole angular velocity
-        u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
-        u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
+    if use_husky:
+        u_1 = control_coeff_matrix[2, cube_idx]
+        u_2 = control_coeff_matrix[3, cube_idx]
+        control_evolution[time_step, 0] = u_1
+        control_evolution[time_step, 1] = u_2
 
-        control_evolution[time_step, 0] = u1_value
-        control_evolution[time_step, 1] = u2_value
+        new_state[2] = new_state[2] + u_1
+        new_state[3] = new_state[3] + u_2
 
-        # add this scalar to the 2 and 4th dimension
-        new_state[1] = curr_state[1] + u1_value
-        new_state[3] = curr_state[3] + u2_value
-    elif num_controllers == 1 and curr_state.shape[0] == 4:
-        # get the control value
-        poly_coeff = control_coeff_matrix[cube_idx]
-        poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff)
-        # x - cart position
-        # y - dx - cart velocity
-        # z - theta - cart pole angle
-        # a - dtheta - cart pole angular velocity
-        value = poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
-        # print(value)
+    else:
+        if num_controllers == 2 and curr_state.shape[0] == 4:
+            # get the control value
+            poly_coeff_1 = control_coeff_matrix[0][cube_idx]
+            poly_coeff_2 = control_coeff_matrix[1][cube_idx]
+            u1_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_1)
+            u2_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_2)
+            # x - cart position
+            # y - dx - cart velocity
+            # z - theta - cart pole angle
+            # a - dtheta - cart pole angular velocity
+            u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
+            u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
 
-        # add this scalar to the 2 and 4th dimension
-        new_state[1] = curr_state[1] + value
-        new_state[3] = curr_state[3] + value
+            control_evolution[time_step, 0] = u1_value
+            control_evolution[time_step, 1] = u2_value
 
-    elif num_controllers == 2 and curr_state.shape[0] == 2:
-        # get the control value
-        poly_coeff_1 = control_coeff_matrix[0][cube_idx]
-        poly_coeff_2 = control_coeff_matrix[1][cube_idx]
-        u1_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_1)
-        u2_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_2)
-        # x - position
-        # y - position
-        u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
-        u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            # add this scalar to the 2 and 4th dimension
+            new_state[1] = curr_state[1] + u1_value
+            new_state[3] = curr_state[3] + u2_value
+        elif num_controllers == 1 and curr_state.shape[0] == 4:
+            # get the control value - old code
+            # poly_coeff = control_coeff_matrix[cube_idx]
+            # poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff)
+            # # x - cart position
+            # # y - dx - cart velocity
+            # # z - theta - cart pole angle
+            # # a - dtheta - cart pole angular velocity
+            # value = poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
+            # # print(value)
+            #
+            # # add this scalar to the 2 and 4th dimension
+            # new_state[1] = curr_state[1] + value
+            # new_state[3] = curr_state[3] + value
+            u_1 = control_coeff_matrix[1, cube_idx]
+            u_2 = control_coeff_matrix[3, cube_idx]
+            control_evolution[time_step, 0] = u_1
+            control_evolution[time_step, 1] = u_2
 
-        # control_evolution[time_step, 0] = u1_value
-        # control_evolution[time_step, 1] = u2_value
+            new_state[1] = new_state[1] + u_1
+            new_state[3] = new_state[3] + u_2
 
-        ##### TESTING 0.5 - u case
-        control_evolution[time_step, 0] = 0.5 - u1_value
-        control_evolution[time_step, 1] = 0.5 - u2_value
+        elif num_controllers == 2 and curr_state.shape[0] == 2:
+            # get the control value
+            poly_coeff_1 = control_coeff_matrix[0][cube_idx]
+            poly_coeff_2 = control_coeff_matrix[1][cube_idx]
+            u1_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_1)
+            u2_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_2)
+            # x - position
+            # y - position
+            u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
 
-        # add this scalar to the 2 and 4th dimension
-        new_state[0] = curr_state[0] + 0.5 - u1_value
-        new_state[1] = curr_state[1] + 0.5 - u2_value
+            # control_evolution[time_step, 0] = u1_value
+            # control_evolution[time_step, 1] = u2_value
 
-    elif num_controllers == 1 and curr_state.shape[0] == 2:
-        if cube_idx == 109:
-            poly_coeff = control_coeff_matrix[cube_idx]
-            u = 0.1
-        elif cube_idx == 210:
-            poly_coeff = control_coeff_matrix[cube_idx]
-            u = 0.1
-        else:
-            print("ERROR, no controller coeff available for any other hypercubes")
-            # exit()
-            u = 0.0
-        # gamma_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
-        # gamma_poly_value = gamma_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
-        #
-        # u_1, u_2 = create_new_controller(gamma_poly_val=gamma_poly_value,
-        #                                  A_ub=A_ub[cube_idx],
-        #                                  A_lb=A_lb[cube_idx],
-        #                                  b_ub=b_ub[cube_idx],
-        #                                  b_lb=b_lb[cube_idx],
-        #                                  curr_state=curr_state,
-        #                                  next_state=next_state[0])
-        #
-        # new_state[0] = curr_state[0] + u_1
-        # new_state[0] = curr_state[0] + u_2
+            ##### TESTING 0.5 - u case
+            control_evolution[time_step, 0] = 0.5 - u1_value
+            control_evolution[time_step, 1] = 0.5 - u2_value
 
-        # u = 0.1
-        new_state[0] = next_state[0] + u
-        new_state[1] = next_state[1] + u
+            # add this scalar to the 2 and 4th dimension
+            new_state[0] = curr_state[0] + 0.5 - u1_value
+            new_state[1] = curr_state[1] + 0.5 - u2_value
+
+        elif num_controllers == 1 and curr_state.shape[0] == 2:
+            u_1 = control_coeff_matrix[1, cube_idx]
+            control_evolution[time_step, 0] = u_1
+
+            # if cube_idx == 109:
+            #     poly_coeff = control_coeff_matrix[cube_idx]
+            #
+            #     # gamma_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
+            #     # gamma_poly_value = gamma_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            #     #
+            #     # u_1, u_2 = create_new_controller(gamma_poly_val=gamma_poly_value,
+            #     #                                  A_ub=A_ub[cube_idx],
+            #     #                                  A_lb=A_lb[cube_idx],
+            #     #                                  b_ub=b_ub[cube_idx],
+            #     #                                  b_lb=b_lb[cube_idx],
+            #     #                                  curr_state=curr_state,
+            #     #                                  next_state=next_state[0])
+            #     #
+            #     # new_state[0] = next_state[0] + u_1
+            #
+            #     # u_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
+            #     # u_poly_value = u_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            #     # u = 0.1
+            #     u_1 = 0.2158921466980603
+            #     u_2 = 0
+            #
+            #     u_1 = 1.0675779856968595e-9 * curr_state[0]**2 + -2.7031656962177356e-5*curr_state[0] + 0.14585269246501623
+            # elif cube_idx == 210:
+            #     poly_coeff = control_coeff_matrix[cube_idx]
+            #
+            #     # gamma_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
+            #     # gamma_poly_value = gamma_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            #     #
+            #     # u_1, u_2 = create_new_controller(gamma_poly_val=gamma_poly_value,
+            #     #                                  A_ub=A_ub[cube_idx],
+            #     #                                  A_lb=A_lb[cube_idx],
+            #     #                                  b_ub=b_ub[cube_idx],
+            #     #                                  b_lb=b_lb[cube_idx],
+            #     #                                  curr_state=curr_state,
+            #     #                                  next_state=next_state[0])
+            #     #
+            #     # new_state[0] = next_state[0] + u_1
+            #
+            #     # u_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
+            #     # u_poly_value = u_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            #     # u = 0.1
+            #     u_1 = 0
+            #     u_2 = 0
+            # else:
+            #     print("ERROR, no controller coeff available for any other hypercubes")
+            #
+            #     # exit()
+            #     u_poly_value = 0.0
+            #     u_1 = 0
+            #     u_2 = 0
+            # gamma_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff)
+            # gamma_poly_value = gamma_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+            #
+            # u_1, u_2 = create_new_controller(gamma_poly_val=gamma_poly_value,
+            #                                  A_ub=A_ub[cube_idx],
+            #                                  A_lb=A_lb[cube_idx],
+            #                                  b_ub=b_ub[cube_idx],
+            #                                  b_lb=b_lb[cube_idx],
+            #                                  curr_state=curr_state,
+            #                                  next_state=next_state[0])
+            #
+            # new_state[0] = next_state[0] + u_1
+            # new_state[0] = next_state[0] + u_2
+
+            # u = 0.1
+            # u = u_poly_value
+            # new_state[0] = next_state[0] + u
+            # new_state[1] = next_state[1] + u
+
+            ## testing u = x - f(x) + eps
+            # u_1 = curr_state[0] - next_state[0] + epsilon
+            # u_2 = curr_state[1] - next_state[1] + epsilon
+
+            # new_state[0] = new_state[0] + u_1
+            new_state[1] = new_state[1] + u_1
 
     return new_state
 

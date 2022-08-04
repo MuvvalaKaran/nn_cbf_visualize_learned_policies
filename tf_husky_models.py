@@ -163,6 +163,39 @@ def _get_husky_tf_model_1_cross_x_model_9(hidden_neurons: int,
     return model
 
 
+def _get_husky_tf_model_2_cross_x_model_(hidden_neurons: int,
+                                         husky_dir_path: str,
+                                         print_flag: bool = False) -> tf.keras.models.Model:
+    """
+    A helper function that build the learned husky model in OpenAI Gym. The NN architecture is as follows:
+
+    Architecture: Fully-connected Neural Network with 3 Layers
+
+    1.First Hidden layer with Relu - 256
+    1.Second Hidden layer with Relu - 256
+    """
+
+    # build the model
+    input_layer = 4
+    output_layer = 4
+
+    # NOTE: LAYERS has attribute dtype which default to float32
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_1", input_shape=(input_layer,)),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_2"),
+        tf.keras.layers.Dense(output_layer, name="predictions")
+    ])
+
+    # load model weights
+    model.load_weights(filepath=husky_dir_path)
+
+    # when you use summary the input object is not displayed as it is not a layer.
+    if print_flag:
+        model.summary()
+
+    return model
+
+
 ### for 3 layers with Relu, Relu and tanh activation
 def _get_husky_tf_model_3_cross_x_model_3(hidden_neurons: int,
                                   print_flag: bool = False) -> tf.keras.models.Model:
