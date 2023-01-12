@@ -261,6 +261,7 @@ def evolve_according_to_controller(partitions,
                                    time_step: int = 0,
                                    epsilon = 0,
                                    use_husky: bool = False,
+                                   use_acrobot: bool = False,
                                    print_flag: bool = False) -> np.array:
     """
     A helper function to get next state as per the control polynomial
@@ -303,6 +304,12 @@ def evolve_according_to_controller(partitions,
 
         new_state[2] = new_state[2] + u_1
         new_state[3] = new_state[3] + u_2
+
+    elif use_acrobot:
+        u_1 = control_coeff_matrix[5, cube_idx]
+        control_evolution[time_step, 0] = u_1
+
+        new_state[5] = new_state[5] + u_1
 
     else:
         if num_controllers == 2 and curr_state.shape[0] == 4:

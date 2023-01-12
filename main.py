@@ -25,6 +25,11 @@ from tf_pendulum_utls import simulate_learned_pendulum_model, simulate_pendulum,
 
 from cartpole_utls import get_cartpole_tf_model_2_cross_x_models, get_cartpole_tf_model_3_cross_x_models
 
+from acrobot_utls import plot_acrobot_state_evolution
+
+from tf_acrobot_models import get_acrobot_tf_model_1_cross_x, get_acrobot_tf_model_2_cross_x,\
+    get_acrobot_tf_model_3_cross_x
+
 from gen_utls import deprecated
 
 import os
@@ -36,6 +41,23 @@ class Agent:
         position, velocity, angle, angle_velocity = observation
         action = int(3. * angle + angle_velocity > 0.)
         return action
+
+
+class Acrobot_v1:
+    def decide(self, observation):
+        x0, y0, x1, y1, v0, v1 = observation
+        if v1 < -0.3:
+            action = 0
+        elif v1 > 0.3:
+            action = 2
+        else:
+            y = y1 + x0 * y1 + x1 * y0
+            if y > 0.:
+                action = 0
+            else:
+                action = 2
+        return action
+
 
 
 def play_once_pendulum(init_state, env, agent, render=False, verbose=False):
@@ -76,7 +98,6 @@ def get_one_step_op_pendulum(init_state, env, agent):
     return next_state
 
 
-
 def get_one_step_op_cartpole(init_state, env, agent):
     env.reset()
     env.unwrapped.state = init_state
@@ -85,28 +106,70 @@ def get_one_step_op_cartpole(init_state, env, agent):
     return next_state
 
 
+def get_one_step_op_acrobat(init_state, env, agent):
+    env.reset()
+    # env.unwrapped.state = init_state
+    # action = agent.decide(env.unwrapped.state)
+    action = agent.decide(env.observation_space)
+    next_state, _, _, _ = env.step(action)
+    return next_state
+
+
+def play_once_acrobat(init_state, env, agent, render=False, verbose=False):
+    _state = []
+    copied_env = deepcopy(env)
+    env.reset()
+
+    observation = env.reset()
+    episode_reward = 0.
+    while True:
+        action = agent.decide(observation)
+        observation, reward, done, _ = env.step(action)
+        episode_reward += reward
+        if done:
+            break
+    return episode_reward
+
+
 def play_once_cartpole(init_state, env, agent, render=False, verbose=False):
     _state = []
     copied_env = deepcopy(env)
     env.reset()
-    # observation = env.unwrapped.state
-    env.unwrapped.state = init_state
+    # modified for acrobot
+    env.unwrapped.state =np.array([math.pi, 0, 0, 0])
+    # observation = env.reset()
     observation = init_state
-    _state.append(init_state)
+
+    # observation = env.unwrapped.state
+    # env.unwrapped.state = init_state
+    # observation = init_state
+    # _state.append(init_state)
     episode_reward = 0.
+    count = 0
     for step in itertools.count():
         if render:
+            vid = video_recorder.VideoRecorder(env,
+                                               path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/video/video1.mp4')
             env.render()
-        action = agent.decide(observation)
-        next_state = get_one_step_op_cartpole(init_state=observation, env=copied_env, agent=agent)
+            vid.capture_frame()
+        if step == 0:
+            s = env.unwrapped.state
+            action = agent.decide(np.array([math.cos(s[0]), math.sin(s[0]), math.cos(s[1]), math.sin(s[1]), s[2], s[3]]))
+            _state.append(np.array([math.cos(s[0]), math.sin(s[0]), math.cos(s[1]), math.sin(s[1]), s[2], s[3]]))
+        else:
+            action = agent.decide(observation)
+        # next_state = get_one_step_op_acrobat(init_state=observation, env=copied_env, agent=agent)
         observation, reward, done, _ = env.step(action)
-        if not np.allclose(observation, next_state, atol=0.0001):
-            print("***************************FIX ME: Get next state() is NOT working*********************************")
+        # if done:
+        #     break
+        # if not np.allclose(observation, next_state, atol=0.0001):
+        #     print("***************************FIX ME: Get next state() is NOT working*********************************")
         episode_reward += reward
         _state.append(observation)
-        if done:
+        if count > 100:
             # pass
             break
+        count += 1
     if verbose:
         print('get {} rewards in {} steps'.format(
                 episode_reward, step + 1))
@@ -160,6 +223,55 @@ def generate_data(print_flag: bool = False):
     file_handle.close()
 
 
+def generate_acrobat_data():
+    """
+    A helper function to create data for the acrobat using the expert controller from
+
+    https://github.com/ZhiqingXiao/OpenAIGymSolution/blob/master/Acrobot-v1/acrobot_v1_close_form.ipynb
+    :return:
+    """
+
+    num_trajectories = 50000
+
+    filename = f'/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/certified_nn_bounds/data/acrobot_v1_{num_trajectories}.txt'
+
+    ''' Create a file tp dump the data in csv format '''
+    # with open(filename, 'w') as file_handle:
+    #     file_handle.write('"ip1","ip2","ip3","ip4","ip5","ip6", "op1","op2","op3","op4","op5","op6"')
+    #     file_handle.write('\n')
+    #     file_handle.close()
+    #
+    # '''Generate Synthetic Data '''
+    # print("Performing rollouts ")
+    # file_handle = open(filename, 'a')
+
+
+
+    _acrobat_agent = Acrobot_v1()
+    _acrobat_gym_agent = gym.make("Acrobot-v1")
+    
+    # modifying lows and high only for this session
+    # self.np_random.uniform(low=-0.5, high=0.5, size=(4,))   - from gym.acrobatEnv
+
+    for i in range(num_trajectories):
+        # 100 steps per trajectory
+        ip = _acrobat_gym_agent.reset()
+        curr_state = ip
+        # for _step in range(100):
+            # get the next state
+        action = _acrobat_agent.decide(curr_state)
+        observation, reward, done, _ = _acrobat_gym_agent.step(action)
+        op_state = observation
+        #
+        # file_handle.write(
+        #     f'"{curr_state[0]}","{curr_state[1]}","{curr_state[2]}","{curr_state[3]}","{curr_state[4]}","{curr_state[5]}","{op_state[0]}","{op_state[1]}","{op_state[2]}","{op_state[3]}","{op_state[4]}","{op_state[5]}"')
+        # file_handle.write('\n')
+
+        # curr_state = op_state
+
+    # file_handle.close()
+
+
 @deprecated
 def generate_data_pendulum():
     """
@@ -210,6 +322,103 @@ def generate_data_pendulum():
         file_handle.write('\n')
 
     file_handle.close()
+
+
+def _simulate_learned_acrobot_model(gym_env,
+                                    init_state: np.array = np.array([0.0, 0., -2*0.017, 0.0]),
+                                    record_flag: bool = False,
+                                    simulate_behavior: bool = False,
+                                    plot_behavior: bool = False):
+    _hidden_layer: int = 1
+    if _hidden_layer == 1:
+        # 1 layer Acrobot models
+        model_dirs = [
+            ## First one is the best - computing bounds for this
+             "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/1_layer/acrobot_model_1_cross_512_loss_0.001_data_25000/variables/variables",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/1_layer/acrobot_model_1_cross_512_loss_0.001_data_50000/variables/variables",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/1_layer/acrobot_model_1_cross_512_loss_0.0001_data_50000/variables/variables",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/1_layer/acrobot_model_1_cross_512_loss_0.001_data_100000/variables/variables"
+        ]
+
+        # cartpole_model = tf.keras.models.load_model(cartpole_dir)
+        acrobot_model = get_acrobot_tf_model_1_cross_x(hidden_neurons=512,
+                                                       variables_path=model_dirs[0],
+                                                       print_flag=True)
+    elif _hidden_layer == 2:
+        # 2 layer Acrobot models
+        model_dirs = [
+            ## First one is the best - computing bounds for this
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/2_layer/acrobot_model_2_cross_512_loss_0.001_data_50000/variables/variables",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/2_layer/acrobot_model_2_cross_512_loss_0.0001_data_50000/variables/variables",
+            # "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/2_layer/acrobot_model_2_cross_512_loss_0.001_data_100000/variables/variables",
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/2_layer/acrobot_model_2_cross_512_loss_0.0001_data_100000/variables/variables"
+        ]
+
+        # cartpole_model = tf.keras.models.load_model(cartpole_dir)
+        acrobot_model = get_acrobot_tf_model_2_cross_x(hidden_neurons=512,
+                                                       variables_path=model_dirs[0],
+                                                       print_flag=True)
+
+    elif _hidden_layer == 3:
+        # 3 layer Acrobot models
+        model_dirs = [
+            # goes outside of bounds, smooth behavior
+            "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/3_layer/0_001_loss/"
+            "cartpole_model_3_cross_128_loss_0.001_data_25000/variables/variables",
+        ]
+
+        # cartpole_model = tf.keras.models.load_model(cartpole_dir)
+        acrobot_model = get_acrobot_tf_model_3_cross_x(hidden_neurons=512,
+                                                       variables_path=model_dirs[0],
+                                                       print_flag=True)
+
+    else:
+        sys.exit(-1)
+
+    if simulate_behavior:
+        gym_env.reset()
+        gym_env.render()
+
+        if record_flag:
+            vid = video_recorder.VideoRecorder(gym_env, path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/NN_videos/video_5.mp4')
+
+        # start simulation
+        curr_state = init_state.reshape(1, 6)
+        for steps in range(100):
+            # get next state
+            # for 1 layer
+            next_state = acrobot_model.predict(curr_state)
+
+            gym_env.unwrapped.state = next_state.reshape(6, )
+            if record_flag:
+              vid.capture_frame()
+            gym_env.render()
+            curr_state = next_state
+
+        gym_env.close()
+
+    if plot_behavior:
+        state_space_dim = 6
+        fig, axs = plt.subplots(state_space_dim)
+        fig.suptitle('Acrobot Behavior - Imitation models')
+        color_scheme: list = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:brown', 'tab:cyan', 'tab:purple']
+        legend_list = ['model1', 'model2', 'model3', 'model4', 'model5', 'model6', 'model7']
+        xytests = [(-20, 20), (-20, 30), (-20, 40), (-20, 50), (-20, 60), (-20, 70), (-20, 80)]
+
+        for counter, _model in enumerate(model_dirs):
+            plot_acrobot_state_evolution(dir_path=_model,
+                                         init_state=init_state.reshape(1, state_space_dim),
+                                         fig_axs=axs,
+                                         color=color_scheme[counter],
+                                         legend=legend_list[counter],
+                                         xyloc=xytests[counter], rollout=20)
+        axs[0].text(0.8, 1.2,
+                    "Init State:" + ', '.join(["'{:.{}f}'".format(_s, 5) for _s in init_state]),
+                    horizontalalignment='center', verticalalignment='center',
+                    bbox=dict(boxstyle='round,pad=0.2', fc='yellow', alpha=0.3),
+                    transform=axs[0].transAxes)
+
+        plt.show(block=True)
 
 
 def _simulate_learned_cartpole_model(gym_env,
@@ -777,17 +986,17 @@ def _dump_model_weights():
     # pendulum_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_neurons_64_loss_0.004_data_7500"
 
     # pendulum 3d model
-    pendulum_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.3_data_7500"
-    imitation_pendulum_model = tf.keras.models.load_model(pendulum_dir)
+    # pendulum_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_model_3d_neurons_64_loss_0.3_data_7500"
+    # imitation_pendulum_model = tf.keras.models.load_model(pendulum_dir)
 
     # Husky Model 5
     # husky_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/husky_Models/new_husky256_5/variables/variables"
     # imitation_husky_model = tf.keras.models.load_model(husky_dir)
     # tf_model_model_5 = _get_husky_tf_model_1_cross_x_model_5(hidden_neurons=256)
 
-    imitation_pendulum_model.summary()
-    weight_list = imitation_pendulum_model.get_weights()
-    imitation_pendulum_model.save("pendulum_model_3d_neurons_64_loss_0.3_data_7500.h5")
+    # imitation_pendulum_model.summary()
+    # weight_list = imitation_pendulum_model.get_weights()
+    # imitation_pendulum_model.save("pendulum_model_3d_neurons_64_loss_0.3_data_7500.h5")
 
     # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.01_data_2500"  # model5
     # cartpole_dir = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_model_1_cross_128_loss_0.001_data_2500000" # model4
@@ -800,10 +1009,28 @@ def _dump_model_weights():
     # cartpole_model.summary()
     # weight_list = cartpole_model.get_weights()
     # dump weights using numpy
-    with open('pendulum_model_3d_neurons_64_loss_0.3_data_7500.npy', 'wb') as f:
-        np.save(f, weight_list)
+    # with open('pendulum_model_3d_neurons_64_loss_0.3_data_7500.npy', 'wb') as f:
+    #     np.save(f, weight_list)
 
     # cartpole_model.save("husky_model_5.h5")
+
+    # dump acrobot weight as numpy
+    one_layer_model = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/" \
+                      "1_layer/acrobot_model_1_cross_512_loss_0.001_data_25000/variables/variables"
+    
+    two_layer_model = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/acrobot_models/" \
+                      "2_layer/acrobot_model_2_cross_512_loss_0.001_data_50000/variables/variables"
+
+    acrobot_model = get_acrobot_tf_model_1_cross_x(hidden_neurons=512, variables_path=one_layer_model)
+    weight_list = acrobot_model.get_weights()
+    # weight_list = imitation_pendulum_model.get_weights()
+    with open('/home/karan/Documents/research/nn_veri_w_crown/cbf_nn/acrobot_models/acrobot_2_layer_model.npy', 'wb')\
+            as file:
+        np.save(file, weight_list)
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -817,13 +1044,16 @@ if __name__ == "__main__":
     plot_husky: bool = False
     plot_pendulum: bool = False
     simulate_pendulum_flag: bool = False
+    generate_acrobat_data_flag: bool = False   # Flag to generate acrobot data
+    simulate_acrobot: bool = False  # Flag to simulate expert controller behavior
+    simulate_nn_acrobat: bool = True  # Flag to simulate trained NN for acrobot
 
     # _plot_state_evolution()
-    init_state = np.array([0, 0, 3*0.017, 0])
+    # init_state = np.array([0, 0, 3*0.017, 0])
     # pendulum = gym.make("Pendulum-v0")
     # init_state = pendulum.reset()
     # compare_models_stability(init_state=init_state)
-    compare_models_w_rl_agent(init_state=init_state)
+    # compare_models_w_rl_agent(init_state=init_state)
     # plot_4d_data()
     # sys.exit(-1)
 
@@ -896,11 +1126,12 @@ if __name__ == "__main__":
         for ep in range(5):
             mu, sigma = 0, 0.1  # mean and standard deviation
             init_state = np.random.normal(mu, sigma, size=(4, ))
-            _, _state = play_once_cartpole(init_state=np.array([0, 0, 0.1, 0]),
+
+            _, _state = play_once_cartpole(init_state=np.array([0, 0, 0.1, 0, 0, 0]),
                                            env=cartpole,
                                            agent=agent,
-                                           render=True,
-                                           verbose=True)
+                                           render=False,
+                                           verbose=False)
             cartpole.close()
 
             for dim in range(3):
@@ -909,10 +1140,50 @@ if __name__ == "__main__":
 
         plt.show()
 
+    elif simulate_acrobot:
+        _acrobot_gym_agent = gym.make("Acrobot-v1")
+        _expert_agent = Acrobot_v1()
+        # if record_flag:
+        # cartpole = Monitor(gym.make("Acrobot-v1"), './video', force=True)
+        fig, axs = plt.subplots(6)
+        fig.suptitle('Acrobot - v1')
+        fig.set_size_inches(18.5, 10.5, forward=True)
+        ylabels: list = [r"$Cos(\theta_1)$", r"$Sin(\theta_1)$", r"$Cos(\theta_1)$", r"$Sin(\theta_1)$", r"$v_1$",
+                         r"$v_2$"]
+        for ep in range(1):
+            mu, sigma = 0, 0.1  # mean and standard deviation
+            # init_state = np.random.normal(mu, sigma, size=(6, ))
+            init_state = np.array([-1, 0, 0, 1])
+            _, _state = play_once_cartpole(init_state=init_state,
+                                           env=_acrobot_gym_agent,
+                                           agent=_expert_agent,
+                                           render=True,
+                                           verbose=True)
+            _acrobot_gym_agent.close()
+
+            for dim in range(6):
+                axs[dim].plot(np.array(_state)[:, dim])
+                # axs[dim].legend(loc='best')
+                axs[dim].set(xlabel='time-step', ylabel=ylabels[dim])
+
+        plt.show()
+        sys.exit(-1)
+
     elif simulate_nn:
         cartpole = gym.make("CartPole-v0")
         _simulate_learned_cartpole_model(gym_env=cartpole,
                                          record_flag=record_flag)
+
+    elif simulate_nn_acrobat:
+        acrobot = gym.make("Acrobot-v1")
+        lows = [-0.5, -0.5, -0.5, -0.5, -0.1, -0.1]
+        highs = [0.5, 0.5, 0.5, 0.5, 0.1, 0.1]
+        init_state = acrobot.np_random.uniform(low=lows, high=highs, size=(6,))
+        _simulate_learned_acrobot_model(gym_env=acrobot,
+                                        init_state=init_state,
+                                        record_flag=record_flag,
+                                        plot_behavior=True)
+
     elif generate_data_flag:
         generate_data()
 
@@ -920,5 +1191,8 @@ if __name__ == "__main__":
         # generate_data_pendulum()
         generate_2d_pendulum_data()
         # generate_3d_pendulum_data()
+
+    elif generate_acrobat_data_flag:
+        generate_acrobat_data()
 
 
