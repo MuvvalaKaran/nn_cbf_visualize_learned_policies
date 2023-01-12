@@ -17,7 +17,8 @@ def plot_2d_toy_sys_from_data_file(data_array: np.array,
                                    title: str = '',
                                    plot_boundary: bool = False,
                                    bdry_dict: dict = {},
-                                   block_plot: bool = False):
+                                   block_plot: bool = False,
+                                   save_path: str = ''):
     """
     A helper function to plot using the data file.
     :param file_path:
@@ -115,7 +116,9 @@ def plot_2d_toy_sys_from_data_file(data_array: np.array,
     # plt.savefig("/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_controller.png", dpi=300)
     if block_plot:
         # plt.show(block=True)
-        plt.savefig("/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_controller.png", dpi=300)
+        # plt.savefig("/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/"
+        #             "acrobot_control_data/acrobot_no_controller.png", dpi=300)
+        plt.savefig(save_path, dpi=300)
     else:
         plt.show()
 

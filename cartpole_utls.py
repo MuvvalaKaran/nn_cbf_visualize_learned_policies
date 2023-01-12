@@ -161,14 +161,20 @@ def simulate_cartpole_w_cbf(system_state: np.array,
 
         if record_flag:
             vid = video_recorder.VideoRecorder(cartpole,
+                                               # path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/'
+                                               #      'cbf_videos/cartpole_no_cbf_sim.mp4',
                                                path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/'
-                                                    'cbf_videos/cartpole_no_cbf_sim.mp4')
+                                                    'cbf_videos/cartpole_w_noise_sim.mp4'
+                                               )
 
     # start simulation - keep track of states
     state_evolution = np.zeros(shape=(rollout+1, s_dim))
     control_evolution = np.zeros(shape=(rollout, 2))
     curr_state = system_state.reshape(1, 4)
     state_evolution[0] = curr_state
+
+    mu, sigma = 0, 0.1  # mean and standard deviation
+    np.random.seed(2)
 
     for step in range(rollout):
         # get next state
@@ -177,7 +183,7 @@ def simulate_cartpole_w_cbf(system_state: np.array,
 
             # for 2+ layers that are trained over drift
             delta = cartpole_model.predict(curr_state)
-            tmp_next_state = delta + curr_state
+            tmp_next_state = delta + curr_state + np.random.normal(mu, sigma, size=(4,))
 
             next_state = evolve_according_to_controller(partitions=processed_partitions,
                                                         partition_dim_list=partition_dim_list,
@@ -215,14 +221,16 @@ def simulate_cartpole_w_cbf(system_state: np.array,
 
     if visualize:
         # plot_from_data_file(state_evolution=state_evolution)
-        # plot_2d_toy_sys_from_data_file(data_array=control_evolution,
-        #                                # ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
-        #                                ylabels=[r"$u1 $", "$u2 $"],
-        #                                # title='Cartpole Model - Trajectory in each dimension',
-        #                                plot_boundary=False,
-        #                                bdry_dict=dict({0: [-10, 10], 1: [-10, 10]})  # control min-max values for
-        #                                # bdry_dict=dict({0: [-1, 1], 2: [-math.pi / 12, math.pi / 12]})
-        #                                )
+        plot_2d_toy_sys_from_data_file(data_array=control_evolution,
+                                       # ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
+                                       ylabels=[r"$u1 $", "$u2 $"],
+                                       # title='Cartpole Model - Trajectory in each dimension',
+                                       plot_boundary=True,
+                                       bdry_dict=dict({0: [-1, 1], 1: [-1, 1]}),  # control min-max values for
+                                       # bdry_dict=dict({0: [-1, 1], 2: [-math.pi / 12, math.pi / 12]})
+                                       save_path= "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_2l_w_noise/cartpole_ctrl_w_noise.png",
+                                       block_plot=False
+                                       )
 
         plot_2d_toy_sys_from_data_file(data_array=state_evolution,
                                        ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
@@ -231,9 +239,11 @@ def simulate_cartpole_w_cbf(system_state: np.array,
                                        plot_boundary=True,
                                        # bdry_dict=dict({0: [-10, 10], 1: [-10, 10]})  # control min-max values for
                                        bdry_dict=dict({0: [-1, 1],
-                                                       2: [-math.pi / 12, math.pi / 12],
+                                                       2: [-math.pi / 15, math.pi / 15],
                                                        1: [-0.5, 0.5],
-                                                       3: [-0.5, 0.5]})
+                                                       3: [-0.5, 0.5]}),
+                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_2l_w_noise/cartpole_state_w_noise.png",
+                                       block_plot=False
                                        )
 
     ''' Save the model in the data folder '''
@@ -367,11 +377,11 @@ if __name__ == "__main__":
             simulate_cartpole_w_cbf(system_state=_system_state,
                                     mat_file_dir=cartpole_control_mat_file,
                                     print_flag=True,
-                                    use_controller=False,
-                                    visualize=False,
+                                    use_controller=True,
+                                    visualize=True,
                                     rollout=500,
                                     num_controllers=1,
-                                    record_flag=True,
+                                    record_flag=False,
                                     simulate=True)
 
         # file_path = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_control_data/" \

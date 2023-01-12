@@ -18,6 +18,7 @@ from tf_toy_system_utls import plot_2d_toy_sys_from_data_file
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+
 class PendulumAgent:
     def decide(self, observation):
         x, y, angle_velocity = observation
@@ -781,6 +782,9 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
     curr_state = system_state.reshape(1, 2)
     state_evolution[0] = curr_state
 
+    mu, sigma = 0, 0.1  # mean and standard deviation
+    np.random.seed(2)
+
     # rollout trajectory
     if simulate:
         pendulum_handle = gym.make("Pendulum-v0")
@@ -790,12 +794,12 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
         if record_flag:
             vid = video_recorder.VideoRecorder(pendulum_handle,
                                                path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/'
-                                                    'cbf_videos/pendulum_cbf.mp4')
+                                                    'cbf_videos/pendulum_cbf_w_noise.mp4')
 
     for step in range(rollout):
         # get next state
         if use_controller:
-            tmp_next_state = tf_pendulum_models.predict(curr_state)
+            tmp_next_state = tf_pendulum_models.predict(curr_state) + np.random.normal(mu, sigma, size=(2,))
             next_state = evolve_according_to_controller(partitions=processed_partitions,
                                                         partition_dim_list=partition_dim_list,
                                                         curr_state=curr_state,
@@ -840,7 +844,10 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
                                        # title='Pendulum Model - Trajectory in each dimension',
                                        plot_boundary=True,
                                        # bdry_dict=dict({0: [-1, 1]})  # control min-max values for
-                                       bdry_dict=dict({0: [-math.pi/15, math.pi/15], 1: [-1, 1]})
+                                       bdry_dict=dict({0: [-math.pi/15, math.pi/15], 1: [-1, 1]}),
+                                       block_plot=False,
+                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/"
+                    "pendulum_3l_w_noise/pen_state_w_noise.png"
                                        )
 
         # plot_from_data_file(state_evolution=state_evolution)
@@ -849,7 +856,10 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
                                        ylabels=[r"$u1 $"],
                                        # title='Cartpole Model - Trajectory in each dimension',
                                        plot_boundary=False,
-                                       bdry_dict=dict({0: [-1, 1]})  # control min-max values for
+                                       bdry_dict=dict({0: [-1, 1]}),  # control min-max values for
+                                       block_plot=False,
+                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/"
+                    "pendulum_3l_w_noise/pen_ctrl_w_noise.png"
                                        )
 
 
@@ -869,5 +879,5 @@ if __name__ == "__main__":
                                   print_flag=False,
                                   use_controller=True,
                                   visulaize_traj=False,
-                                  record_flag=True,
+                                  record_flag=False,
                                   simulate=True)
