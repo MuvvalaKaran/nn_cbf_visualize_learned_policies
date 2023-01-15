@@ -48,6 +48,32 @@ def get_pendulum_tf_model_1_cross_x_models(hidden_neurons: int,
     return model
 
 
+def get_2d_pendulum_tf_model_2_cross_x_models(hidden_neurons: int,
+                                              var_dir_path: str,
+                                              input_neurons: int = 2,
+                                              output_neurons: int = 2,
+                                              print_flag: bool = False) -> tf.keras.models.Model:
+    """
+    A helper function that build the learned pendulum model in OpenAI Gym. The NN architecture is as follows:
+    """
+
+    # NOTE: LAYERS has attribute dtype which default to float32
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_1", input_shape=(input_neurons,)),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_2"),
+        tf.keras.layers.Dense(output_neurons, name="predictions")
+    ])
+
+    # load model weights
+    model.load_weights(filepath=var_dir_path)
+
+    # when you use summary the input object is not displayed as it is not a layer.
+    if print_flag:
+        model.summary()
+
+    return model
+
+
 def get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons: int,
                                               var_dir_path: str,
                                               input_neurons: int = 2,
@@ -62,6 +88,35 @@ def get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons: int,
         tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_1", input_shape=(input_neurons,)),
         tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_2"),
         tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_3"),
+        tf.keras.layers.Dense(output_neurons, name="predictions")
+    ])
+
+    # load model weights
+    model.load_weights(filepath=var_dir_path)
+
+    # when you use summary the input object is not displayed as it is not a layer.
+    if print_flag:
+        model.summary()
+
+    return model
+
+
+def get_2d_pendulum_tf_model_5_cross_x_models(hidden_neurons: int,
+                                              var_dir_path: str,
+                                              input_neurons: int = 2,
+                                              output_neurons: int = 2,
+                                              print_flag: bool = False) -> tf.keras.models.Model:
+    """
+    A helper function that build the learned pendulum model in OpenAI Gym. The NN architecture is as follows:
+    """
+
+    # NOTE: LAYERS has attribute dtype which default to float32
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_1", input_shape=(input_neurons,)),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_2"),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_3"),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_4"),
+        tf.keras.layers.Dense(hidden_neurons, activation='relu', name="dense_5"),
         tf.keras.layers.Dense(output_neurons, name="predictions")
     ])
 

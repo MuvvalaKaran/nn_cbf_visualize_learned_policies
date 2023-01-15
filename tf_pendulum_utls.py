@@ -9,8 +9,9 @@ import matplotlib.animation as animation
 
 from scipy.io import loadmat
 from gen_utls import create_hypercube_idx_dict, evolve_according_to_controller, \
-    postprocess_partition_dump, get_hypercube, plot_learned_sys_phase_portrait
-from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models, get_2d_pendulum_tf_model_3_cross_x_models
+    postprocess_partition_dump, get_hypercube, plot_learned_sys_phase_portrait, look_up_partition
+from tf_pendulum_models import get_pendulum_tf_model_1_cross_x_models, get_2d_pendulum_tf_model_3_cross_x_models,\
+    get_2d_pendulum_tf_model_2_cross_x_models, get_2d_pendulum_tf_model_5_cross_x_models
 from gym.wrappers.monitoring import video_recorder
 from tf_toy_system_utls import plot_2d_toy_sys_from_data_file
 
@@ -732,6 +733,8 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
                                   use_controller: bool = False,
                                   visulaize_traj: bool = False,
                                   record_flag: bool = False,
+                                  save_path:str='',
+                                  partition_size = '',
                                   simulate: bool = False):
     """
     A helper function to plot the evolution of the states of 2d and 3d pendulum along with the additive controller
@@ -766,15 +769,39 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
     hypercube_idx_dict = create_hypercube_idx_dict(processed_partitions)
 
     # tf_pendulum_models = tf.keras.models.load_model(cartpole_dir)
-    tf_pendulum_models = get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons=64,
+    # 3 layer model
+    # tf_pendulum_models = get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons=64,
+    #                                                                var_dir_path="/home/karan/Documents/research/"
+    #                                                                             "nn_veri_w_crown/rl_train_agent/" \
+    #                                                                             "new_pendulum_imitation_models/"
+    #                                                                             "2d_sys/3_layer/64_neurons/" \
+    #                                 "pendulum_model_2d_neurons_3_cross_64_loss_0.001_data_50000/variables/variables",
+    #                                                                input_neurons=2,
+    #                                                                output_neurons=2,
+    #                                                                print_flag=False)
+
+    # 2 layer model
+    # tf_pendulum_models = get_2d_pendulum_tf_model_2_cross_x_models(hidden_neurons=64,
+    #                                                                var_dir_path="/home/karan/Documents/research/"
+    #                                                                             "nn_veri_w_crown/rl_train_agent/" \
+    #                                                                              "new_pendulum_imitation_models/"
+    #                                                                             "2d_sys/2_layer/64_neurons/" \
+    #                                 "pendulum_model_2d_neurons_2_cross_64_loss_0.001_data_50000/variables/variables",
+    #                                                                input_neurons=2,
+    #                                                                output_neurons=2,
+    #                                                                print_flag=False)
+
+    # 5 layer model
+    tf_pendulum_models = get_2d_pendulum_tf_model_5_cross_x_models(hidden_neurons=64,
                                                                    var_dir_path="/home/karan/Documents/research/"
                                                                                 "nn_veri_w_crown/rl_train_agent/" \
                                                                                 "new_pendulum_imitation_models/"
-                                                                                "2d_sys/3_layer/64_neurons/" \
-                                    "pendulum_model_2d_neurons_3_cross_64_loss_0.001_data_50000/variables/variables",
+                                                                                "2d_sys/5_layer/64_neurons/" \
+                                    "pendulum_model_2d_neurons_5_cross_64_loss_0.001_data_50000/variables/variables",
                                                                    input_neurons=2,
                                                                    output_neurons=2,
-                                                                   print_flag=True)
+                                                                   print_flag=False)
+
 
     # start simulation - keep track of states
     state_evolution = np.zeros(shape=(rollout + 1, s_dim))
@@ -782,8 +809,8 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
     curr_state = system_state.reshape(1, 2)
     state_evolution[0] = curr_state
 
-    mu, sigma = 0, 0.1  # mean and standard deviation
-    np.random.seed(2)
+    mu, sigma = 0, 0.01  # mean and standard deviation
+    # np.random.seed(2)
 
     # rollout trajectory
     if simulate:
@@ -793,6 +820,7 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
 
         if record_flag:
             vid = video_recorder.VideoRecorder(pendulum_handle,
+                                               # path=f'{save_path}/pen_vid_{partition_size}_{system_state[0]}_{system_state[1]}.mp4')
                                                path='/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/'
                                                     'cbf_videos/pendulum_cbf_w_noise.mp4')
 
@@ -816,7 +844,19 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
                                                         epsilon=eps[0, 0],
                                                         print_flag=False)
         else:
-            next_state = tf_pendulum_models.predict(curr_state)
+            cube_idx = look_up_partition(system_hypercubes=processed_partitions,
+                                         system_dim_partitions=partition_dim_list,
+                                         system_state=curr_state.flatten(),
+                                         hypercube_dict=hypercube_idx_dict,
+                                         print_flag=False)
+            if cube_idx is None:
+                # break
+                return False
+            tmp_next_state = tf_pendulum_models.predict(curr_state) + np.random.normal(mu, sigma, size=(2,))
+            next_state = tmp_next_state
+
+        if next_state is False:
+            return False
 
         state_evolution[step + 1] = next_state
 
@@ -831,36 +871,97 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
     if simulate:
         pendulum_handle.close()
 
-    if visulaize_traj:
-        fig, axs = plt.subplots(1)
-        fig.suptitle('2d system trajectory')
+    # if visulaize_traj:
+    #     fig, axs = plt.subplots(1)
+    #     fig.suptitle('2d system trajectory')
+    #
+    #     plt.plot(state_evolution[:, 0], state_evolution[:, 1], 'ro', linestyle='-.')
+    #     plt.show(block=True)
+    # else:
+    #     plot_2d_toy_sys_from_data_file(data_array=state_evolution,
+    #                                    ylabels=[r"$\theta$ [rad]", r"$\dot{\theta}$ [rad/s]"],
+    #                                    # title='Pendulum Model - Trajectory in each dimension',
+    #                                    plot_boundary=True,
+    #                                    # bdry_dict=dict({0: [-1, 1]})  # control min-max values for
+    #                                    bdry_dict=dict({0: [-math.pi/15, math.pi/15], 1: [-1, 1]}),
+    #                                    block_plot=False,
+    #                                    save_path=f"/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/" \
+    #                 f"updated_plots/pen_state.png",
+    #                                    )
+    #
+    #     # plot_from_data_file(state_evolution=state_evolution)
+    #     plot_2d_toy_sys_from_data_file(data_array=control_evolution,
+    #                                    # ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
+    #                                    ylabels=[r"$u1 $"],
+    #                                    # title='Cartpole Model - Trajectory in each dimension',
+    #                                    plot_boundary=False,
+    #                                    bdry_dict=dict({0: [-1, 1]}),  # control min-max values for
+    #                                    block_plot=False,
+    #                                    save_path=f"/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/" \
+    #                 f"updated_plots/pen_ctrl.png"
+    #                                    )
 
-        plt.plot(state_evolution[:, 0], state_evolution[:, 1], 'ro', linestyle='-.')
-        plt.show(block=True)
-    else:
-        plot_2d_toy_sys_from_data_file(data_array=state_evolution,
-                                       ylabels=[r"$\theta$ [rad]", r"$\dot{\theta}$ [rad/s]"],
-                                       # ylabels=['Control Mag'],
-                                       # title='Pendulum Model - Trajectory in each dimension',
-                                       plot_boundary=True,
-                                       # bdry_dict=dict({0: [-1, 1]})  # control min-max values for
-                                       bdry_dict=dict({0: [-math.pi/15, math.pi/15], 1: [-1, 1]}),
-                                       block_plot=False,
-                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/"
-                    "pendulum_3l_w_noise/pen_state_w_noise.png"
-                                       )
 
-        # plot_from_data_file(state_evolution=state_evolution)
-        plot_2d_toy_sys_from_data_file(data_array=control_evolution,
-                                       # ylabels=[r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"],
-                                       ylabels=[r"$u1 $"],
-                                       # title='Cartpole Model - Trajectory in each dimension',
-                                       plot_boundary=False,
-                                       bdry_dict=dict({0: [-1, 1]}),  # control min-max values for
-                                       block_plot=False,
-                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/"
-                    "pendulum_3l_w_noise/pen_ctrl_w_noise.png"
-                                       )
+def plot_pendulum_w_cbf_evolution(system_state: np.array,
+                                  tf_model,
+                                  processed_partitions,
+                                  partition_dim_list,
+                                  rollout: int = 100,
+                                  use_controller: bool = False):
+
+    """
+     PLot multiple runs on the same plot
+
+    :return:
+    """
+    # start simulation - keep track of states
+    state_evolution = np.zeros(shape=(rollout + 1, s_dim))
+    control_evolution = np.zeros(shape=(rollout, 1))
+    curr_state = system_state.reshape(1, 2)
+    state_evolution[0] = curr_state
+
+    mu, sigma = 0, 0.01  # mean and standard deviation
+
+    for step in range(rollout):
+        # get next state
+        if use_controller:
+            tmp_next_state = tf_model.predict(curr_state) + np.random.normal(mu, sigma, size=(2,))
+            next_state = evolve_according_to_controller(partitions=processed_partitions,
+                                                        partition_dim_list=partition_dim_list,
+                                                        curr_state=curr_state,
+                                                        next_state=tmp_next_state,
+                                                        A_ub=None,
+                                                        A_lb=None,
+                                                        b_ub=None,
+                                                        b_lb=None,
+                                                        hypercube_idx_dict=hypercube_idx_dict,
+                                                        control_evolution=control_evolution,
+                                                        control_coeff_matrix=control_coeff_matrix,
+                                                        num_controllers=1,
+                                                        time_step=step,
+                                                        epsilon=eps[0, 0],
+                                                        print_flag=False)
+        else:
+            cube_idx = look_up_partition(system_hypercubes=processed_partitions,
+                                         system_dim_partitions=partition_dim_list,
+                                         system_state=curr_state.flatten(),
+                                         hypercube_dict=hypercube_idx_dict,
+                                         print_flag=False)
+            if cube_idx is None:
+                break
+                # return False
+            tmp_next_state = tf_model.predict(curr_state) + np.random.normal(mu, sigma, size=(2,))
+            next_state = tmp_next_state
+
+        if next_state is False:
+            break
+            # return False
+
+        state_evolution[step + 1] = next_state
+        curr_state = next_state.reshape(1, 2)
+
+    return state_evolution, control_evolution
+
 
 
 if __name__ == "__main__":
@@ -868,16 +969,134 @@ if __name__ == "__main__":
 
     # system_state = np.array([1e-8, 1e-8])  # 2d array
     # system_state = np.array([12*(math.pi/180), 0.6])  # 2d array
-    system_state = np.array([0.114, -0.3])  # 2d 3 layer pendulum worst hypercube
+    # system_state = np.array([0.114, -0.3])  # 2d 3 layer pendulum worst hypercube
     # system_state = np.arrya([0, 0, 0]) # 3d array
 
-    plot_pendulum_w_cbf_evolution(system_state=system_state,
-                                  mat_file_dir="/home/karan/Documents/research/nn_veri_w_crown/"
-                                               "rl_train_agent/pendulum_control_data/partition_data_120.mat",
-                                  rollout=1000,
-                                  num_controllers=1,
-                                  print_flag=False,
-                                  use_controller=True,
-                                  visulaize_traj=False,
-                                  record_flag=False,
-                                  simulate=True)
+    # system_state = np.array([0, 0])  # run1
+    system_state = np.array([5*(math.pi/180), 0])  # run2 - 3 times
+    # system_state = np.array([0.08, -1])  # run3
+    # system_state = np.array([-0.08, 0])  # run4
+    # system_state = np.array([-0.08, -1])  # run5 - 36 times
+    # old one
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/" \
+    #                    "rl_train_agent/pendulum_control_data/partition_data_120.mat"
+
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/pendulum/2_layers/partition_data_480.mat"
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/pendulum/3_layers/partition_data_120.mat"
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/pendulum/5_layers/partition_data_120.mat"
+
+    # 3 layer 480
+    mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_2.mat"
+
+    # 2 layer 480
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_3.mat"
+
+    # save_path =
+    # c = 0
+    # for _ in range(100):
+    #     flag = plot_pendulum_w_cbf_evolution(system_state=system_state,
+    #                                           mat_file_dir=mat_file,
+    #                                           partition_size='120',
+    #                                           rollout=100,
+    #                                           num_controllers=1,
+    #                                           print_flag=False,
+    #                                           use_controller=True,
+    #                                           visulaize_traj=False,
+    #                                           record_flag=False,
+    #                                           simulate=False)
+    #
+    #     if flag is not None:
+    #         c += 1
+    #
+    #     print(f"The System Violated Safety constraints {c} times")
+
+
+    #### for plotting multiple times quickly, we only load the mat file and TF model once and pass it
+    # to the plotting function
+    # load the file
+    control_dict = loadmat(mat_file)
+    eps = control_dict.get("eps")
+    state_space = control_dict.get("state_space")
+    s_dim = state_space.shape[0]  # System dimension
+
+    control_coeff_matrix = control_dict.get('array_control')
+
+    partitions, partition_dim_list = get_hypercube(eps=eps.flatten(),
+                                                   state_space=state_space,
+                                                   n=s_dim,
+                                                   print_flag=False)
+
+    # get partitions to create the look up dictionary
+    partition_from_mat = control_dict.get('partitions')
+
+    # process it before creating the dict
+    processed_partitions = postprocess_partition_dump(partition_from_mat)
+
+    # create the hypercube lookup dict
+    hypercube_idx_dict = create_hypercube_idx_dict(processed_partitions)
+
+    # 2 layer model
+    # tf_pendulum_models = get_2d_pendulum_tf_model_2_cross_x_models(hidden_neurons=64,
+    #                                                                var_dir_path="/home/karan/Documents/research/"
+    #                                                                             "nn_veri_w_crown/rl_train_agent/" \
+    #                                                                              "new_pendulum_imitation_models/"
+    #                                                                             "2d_sys/2_layer/64_neurons/" \
+    #                                 "pendulum_model_2d_neurons_2_cross_64_loss_0.001_data_50000/variables/variables",
+    #                                                                input_neurons=2,
+    #                                                                output_neurons=2,
+    #                                                                print_flag=False)
+
+    # 3 layer model
+    tf_pendulum_models = get_2d_pendulum_tf_model_3_cross_x_models(hidden_neurons=64,
+                                                                   var_dir_path="/home/karan/Documents/research/"
+                                                                                "nn_veri_w_crown/rl_train_agent/" \
+                                                                                "new_pendulum_imitation_models/"
+                                                                                "2d_sys/3_layer/64_neurons/" \
+                                    "pendulum_model_2d_neurons_3_cross_64_loss_0.001_data_50000/variables/variables",
+                                                                   input_neurons=2,
+                                                                   output_neurons=2,
+                                                                   print_flag=False)
+
+    state_dim = 2
+    my_dpi = 106
+    fig, axs = plt.subplots(state_dim, figsize=(660 / my_dpi, 520 / my_dpi), dpi=my_dpi)
+    fig.suptitle('Pendulum Monte Carlo Simulation')
+    ylabels = [r"$\theta$ [rad]", r"$\dot{\theta}$ [rad/s]"]
+    bdry_dict = dict({0: [-math.pi / 15, math.pi / 15], 1: [-1, 1]})
+    for _ in range(100):
+        state, control = plot_pendulum_w_cbf_evolution(system_state=system_state,
+                                                       tf_model=tf_pendulum_models,
+                                                       processed_partitions=processed_partitions,
+                                                       partition_dim_list=partition_dim_list,
+                                                       rollout=100,
+                                                       use_controller=False)
+
+        for ax_id in range(state_dim):
+            if state_dim > 1:
+                axs[ax_id].plot(state[:, ax_id], label=ylabels[ax_id])
+                axs[ax_id].set(ylabel=ylabels[ax_id])
+                # axs[ax_id].grid()
+
+            else:
+                axs.plot(control[:, ax_id], label=[r"$u1 $"])
+                axs.set(xlabel='time-step', ylabel=ylabels[ax_id])
+                axs.legend(loc='best')
+                axs.grid()
+
+            # if plot_boundary:
+            # extract upper and lower bounds
+            if state_dim > 1:
+                for axs_num, bounds in bdry_dict.items():
+                    axs[axs_num].axhline(y=bounds[0], color='k', linestyle='--')
+                    axs[axs_num].axhline(y=bounds[1], color='k', linestyle='--')
+            else:
+                bdry_dict = dict({0: [-1, 1]})
+                bounds = bdry_dict.get(0)  # if the dim is less than 1 then the key has to be for 1st state
+                axs.axhline(y=bounds[0], color='k', linestyle='--')
+                axs.axhline(y=bounds[1], color='k', linestyle='--')
+
+        plt.plot()
+
+    axs[0].grid()
+    axs[1].grid()
+    plt.show()

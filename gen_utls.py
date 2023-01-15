@@ -288,12 +288,13 @@ def evolve_according_to_controller(partitions,
                                  system_dim_partitions=partition_dim_list,
                                  system_state=curr_state,
                                  hypercube_dict=hypercube_idx_dict,
-                                 print_flag=True)
+                                 print_flag=False)
 
     if cube_idx is None:
         print(f"**************************************ERROR at step: {time_step} ***********************************")
         import sys
         # sys.exit(-2)
+        return False
         return new_state
 
     if use_husky:
