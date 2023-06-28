@@ -902,12 +902,12 @@ def plot_pendulum_w_cbf_evolution(system_state: np.array,
     #                                    )
 
 
-def plot_pendulum_w_cbf_evolution(system_state: np.array,
-                                  tf_model,
-                                  processed_partitions,
-                                  partition_dim_list,
-                                  rollout: int = 100,
-                                  use_controller: bool = False):
+def mul_plot_pendulum_w_cbf_evolution(system_state: np.array,
+                                      tf_model,
+                                      processed_partitions,
+                                      partition_dim_list,
+                                      rollout: int = 100,
+                                      use_controller: bool = False):
 
     """
      PLot multiple runs on the same plot
@@ -972,8 +972,8 @@ if __name__ == "__main__":
     # system_state = np.array([0.114, -0.3])  # 2d 3 layer pendulum worst hypercube
     # system_state = np.arrya([0, 0, 0]) # 3d array
 
-    # system_state = np.array([0, 0])  # run1
-    system_state = np.array([5*(math.pi/180), 0])  # run2 - 3 times
+    system_state = np.array([0, 0])  # run1
+    # system_state = np.array([5*(math.pi/180), 0])  # run2 - 3 times
     # system_state = np.array([0.08, -1])  # run3
     # system_state = np.array([-0.08, 0])  # run4
     # system_state = np.array([-0.08, -1])  # run5 - 36 times
@@ -986,7 +986,9 @@ if __name__ == "__main__":
     # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/pendulum/5_layers/partition_data_120.mat"
 
     # 3 layer 480
-    mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_2.mat"
+    # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_2.mat"
+    # 3 layer 480 - updated 01/16
+    mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_3layer_mod.mat"
 
     # 2 layer 480
     # mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_ctrl/partition_data_480_3.mat"
@@ -1063,13 +1065,13 @@ if __name__ == "__main__":
     fig.suptitle('Pendulum Monte Carlo Simulation')
     ylabels = [r"$\theta$ [rad]", r"$\dot{\theta}$ [rad/s]"]
     bdry_dict = dict({0: [-math.pi / 15, math.pi / 15], 1: [-1, 1]})
-    for _ in range(100):
-        state, control = plot_pendulum_w_cbf_evolution(system_state=system_state,
-                                                       tf_model=tf_pendulum_models,
-                                                       processed_partitions=processed_partitions,
-                                                       partition_dim_list=partition_dim_list,
-                                                       rollout=100,
-                                                       use_controller=False)
+    for _ in range(1000):
+        state, control = mul_plot_pendulum_w_cbf_evolution(system_state=system_state,
+                                                           tf_model=tf_pendulum_models,
+                                                           processed_partitions=processed_partitions,
+                                                           partition_dim_list=partition_dim_list,
+                                                           rollout=100,
+                                                           use_controller=True)
 
         for ax_id in range(state_dim):
             if state_dim > 1:

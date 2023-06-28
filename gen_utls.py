@@ -313,26 +313,26 @@ def evolve_according_to_controller(partitions,
         new_state[5] = new_state[5] + u_1
 
     else:
-        if num_controllers == 2 and curr_state.shape[0] == 4:
-            # get the control value
-            poly_coeff_1 = control_coeff_matrix[0][cube_idx]
-            poly_coeff_2 = control_coeff_matrix[1][cube_idx]
-            u1_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_1)
-            u2_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_2)
-            # x - cart position
-            # y - dx - cart velocity
-            # z - theta - cart pole angle
-            # a - dtheta - cart pole angular velocity
-            u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
-            u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
-
-            control_evolution[time_step, 0] = u1_value
-            control_evolution[time_step, 1] = u2_value
-
-            # add this scalar to the 2 and 4th dimension
-            new_state[1] = curr_state[1] + u1_value
-            new_state[3] = curr_state[3] + u2_value
-        elif num_controllers == 1 and curr_state.shape[0] == 4:
+        # if num_controllers == 2 and curr_state.shape[0] == 4:
+        #     # get the control value
+        #     poly_coeff_1 = control_coeff_matrix[0][cube_idx]
+        #     poly_coeff_2 = control_coeff_matrix[1][cube_idx]
+        #     u1_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_1)
+        #     u2_poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff_2)
+        #     # x - cart position
+        #     # y - dx - cart velocity
+        #     # z - theta - cart pole angle
+        #     # a - dtheta - cart pole angular velocity
+        #     u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
+        #     u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1]), (z, curr_state[2]), (a, curr_state[3])])
+        #
+        #     control_evolution[time_step, 0] = u1_value
+        #     control_evolution[time_step, 1] = u2_value
+        #
+        #     # add this scalar to the 2 and 4th dimension
+        #     new_state[1] = curr_state[1] + u1_value
+        #     new_state[3] = curr_state[3] + u2_value
+        if num_controllers == 1 and curr_state.shape[0] == 4:
             # get the control value - old code
             # poly_coeff = control_coeff_matrix[cube_idx]
             # poly = get_sym_poly(deg=4, poly_coeffs=poly_coeff)
@@ -354,27 +354,27 @@ def evolve_according_to_controller(partitions,
             new_state[1] = new_state[1] + u_1
             new_state[3] = new_state[3] + u_2
 
-        elif num_controllers == 2 and curr_state.shape[0] == 2:
-            # get the control value
-            poly_coeff_1 = control_coeff_matrix[0][cube_idx]
-            poly_coeff_2 = control_coeff_matrix[1][cube_idx]
-            u1_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_1)
-            u2_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_2)
-            # x - position
-            # y - position
-            u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
-            u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
-
-            # control_evolution[time_step, 0] = u1_value
-            # control_evolution[time_step, 1] = u2_value
-
-            ##### TESTING 0.5 - u case
-            control_evolution[time_step, 0] = 0.5 - u1_value
-            control_evolution[time_step, 1] = 0.5 - u2_value
-
-            # add this scalar to the 2 and 4th dimension
-            new_state[0] = curr_state[0] + 0.5 - u1_value
-            new_state[1] = curr_state[1] + 0.5 - u2_value
+        # elif num_controllers == 2 and curr_state.shape[0] == 2:
+        #     # get the control value
+        #     poly_coeff_1 = control_coeff_matrix[0][cube_idx]
+        #     poly_coeff_2 = control_coeff_matrix[1][cube_idx]
+        #     u1_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_1)
+        #     u2_poly = get_sym_poly(deg=2, poly_coeffs=poly_coeff_2)
+        #     # x - position
+        #     # y - position
+        #     u1_value = u1_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+        #     u2_value = u2_poly.subs([(x, curr_state[0]), (y, curr_state[1])])
+        #
+        #     # control_evolution[time_step, 0] = u1_value
+        #     # control_evolution[time_step, 1] = u2_value
+        #
+        #     ##### TESTING 0.5 - u case
+        #     control_evolution[time_step, 0] = 0.5 - u1_value
+        #     control_evolution[time_step, 1] = 0.5 - u2_value
+        #
+        #     # add this scalar to the 2 and 4th dimension
+        #     new_state[0] = curr_state[0] + 0.5 - u1_value
+        #     new_state[1] = curr_state[1] + 0.5 - u2_value
 
         elif num_controllers == 1 and curr_state.shape[0] == 2:
             u_1 = control_coeff_matrix[1, cube_idx]

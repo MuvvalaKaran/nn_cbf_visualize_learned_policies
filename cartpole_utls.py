@@ -10,7 +10,7 @@ import sys
 
 from scipy.io import loadmat
 from gen_utls import simulate_zamani_ex_1, create_hypercube_idx_dict, evolve_according_to_controller,\
-    postprocess_partition_dump, get_hypercube
+    postprocess_partition_dump, get_hypercube, look_up_partition
 
 from gym.wrappers.monitoring import video_recorder
 
@@ -149,9 +149,14 @@ def simulate_cartpole_w_cbf(system_state: np.array,
     # create the hypercube lookup dict
     hypercube_idx_dict = create_hypercube_idx_dict(processed_partitions)
 
+    # 2 layer model
     cartpole_model = get_cartpole_tf_model_2_cross_x_models(hidden_neurons=128,
                                                             variables_path=cartpole_var_dirpath,
-                                                            print_flag=True)
+                                                            print_flag=False)
+    # 1 layer model
+    # cartpole_model = get_cartpole_tf_model_1_cross_x_models(hidden_neurons=128,
+    #                                                         variables_path=cartpole_var_dirpath,
+    #                                                         print_flag=True)
 
     # rollout trajectory
     if simulate:
@@ -173,12 +178,13 @@ def simulate_cartpole_w_cbf(system_state: np.array,
     curr_state = system_state.reshape(1, 4)
     state_evolution[0] = curr_state
 
-    mu, sigma = 0, 0.1  # mean and standard deviation
-    np.random.seed(2)
+    mu, sigma = 0, 0.01  # mean and standard deviation
+    # np.random.seed(2)
 
     for step in range(rollout):
         # get next state
         if use_controller:
+            # for 1 layer model
             # tmp_next_state = cartpole_model.predict(curr_state)
 
             # for 2+ layers that are trained over drift
@@ -204,8 +210,20 @@ def simulate_cartpole_w_cbf(system_state: np.array,
         else:
             # next_state = cartpole_model.predict(curr_state)
             # for 2+ layers that are trained over drift
+            cube_idx = look_up_partition(system_hypercubes=processed_partitions,
+                                         system_dim_partitions=partition_dim_list,
+                                         system_state=curr_state.flatten(),
+                                         hypercube_dict=hypercube_idx_dict,
+                                         print_flag=False)
+            if cube_idx is None:
+                # break
+                return False
             delta = cartpole_model.predict(curr_state)
-            next_state = delta + curr_state
+            next_state = delta + curr_state + np.random.normal(mu, sigma, size=(4,))
+
+        if next_state is False:
+            break
+            # return False
 
         state_evolution[step+1] = next_state
 
@@ -228,7 +246,7 @@ def simulate_cartpole_w_cbf(system_state: np.array,
                                        plot_boundary=True,
                                        bdry_dict=dict({0: [-1, 1], 1: [-1, 1]}),  # control min-max values for
                                        # bdry_dict=dict({0: [-1, 1], 2: [-math.pi / 12, math.pi / 12]})
-                                       save_path= "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_2l_w_noise/cartpole_ctrl_w_noise.png",
+                                       save_path= "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_plots/cartpole_ctrl_w_noise.png",
                                        block_plot=False
                                        )
 
@@ -242,7 +260,7 @@ def simulate_cartpole_w_cbf(system_state: np.array,
                                                        2: [-math.pi / 15, math.pi / 15],
                                                        1: [-0.5, 0.5],
                                                        3: [-0.5, 0.5]}),
-                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_2l_w_noise/cartpole_state_w_noise.png",
+                                       save_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/updated_plots/cartpole_state_no_ctrl_w_noise.png",
                                        block_plot=False
                                        )
 
@@ -318,6 +336,73 @@ def plot_from_data_file(file_path: str = '', state_evolution=None):
     plt.show(block=True)
 
 
+def mul_plot_cartpole_w_cbf_evolution(system_state: np.array,
+                                  tf_model,
+                                  processed_partitions,
+                                  partition_dim_list,
+                                  rollout: int = 100,
+                                  use_controller: bool = False):
+
+    """
+     PLot multiple runs on the same plot for Cartpole model
+
+    :return:
+    """
+    # start simulation - keep track of states
+    state_evolution = np.zeros(shape=(rollout + 1, s_dim))
+    control_evolution = np.zeros(shape=(rollout, 2))
+    curr_state = system_state.reshape(1, 4)
+    state_evolution[0] = curr_state
+
+    mu, sigma = 0, 0.01  # mean and standard deviation
+
+    for step in range(rollout):
+        # get next state
+        if use_controller:
+            # for 2+ layers that are trained over drift
+            delta = tf_model.predict(curr_state)
+            tmp_next_state = delta + curr_state + np.random.normal(mu, sigma, size=(4,))
+
+            next_state = evolve_according_to_controller(partitions=processed_partitions,
+                                                        partition_dim_list=partition_dim_list,
+                                                        curr_state=curr_state,
+                                                        next_state=tmp_next_state,
+                                                        A_ub=None,
+                                                        A_lb=None,
+                                                        b_ub=None,
+                                                        b_lb=None,
+                                                        hypercube_idx_dict=hypercube_idx_dict,
+                                                        control_evolution=control_evolution,
+                                                        control_coeff_matrix=control_coeff_matrix,
+                                                        num_controllers=1,
+                                                        time_step=step,
+                                                        epsilon=eps[0, 0],
+                                                        print_flag=False)
+
+        else:
+            # next_state = cartpole_model.predict(curr_state)
+            # for 2+ layers that are trained over drift
+            cube_idx = look_up_partition(system_hypercubes=processed_partitions,
+                                         system_dim_partitions=partition_dim_list,
+                                         system_state=curr_state.flatten(),
+                                         hypercube_dict=hypercube_idx_dict,
+                                         print_flag=False)
+            if cube_idx is None:
+                break
+                # return False
+            delta = tf_model.predict(curr_state)
+            next_state = delta + curr_state + np.random.normal(mu, sigma, size=(4,))
+
+        if next_state is False:
+            break
+            # return False
+
+        state_evolution[step + 1] = next_state
+        curr_state = next_state.reshape(1, 4)
+
+    return state_evolution, control_evolution
+
+
 def simulate_cartpole_from_data_file(file_path: str,):
     """
     A helper function to plot using the data file.
@@ -359,34 +444,141 @@ if __name__ == "__main__":
         # cartpole_control_mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/" \
         #                             "pendulum_control_data/control_lags_cartpole_960_updated.mat"
 
-        cartpole_control_mat_file = "/home/karan/Documents/research/nn_veri_w_crown/" \
-                                    "rl_train_agent/cartpole_control_data/cartpole_control_partition_data_960_updated_2.mat"
+        # old one
+        # cartpole_control_mat_file = "/home/karan/Documents/research/nn_veri_w_crown/" \
+        #                             "rl_train_agent/cartpole_control_data/cartpole_control_partition_data_960_updated_2.mat"
+
+        # new one - Jan 23
+        # cartpole_control_mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/" \
+        #                             "updated_ctrl/cartpole/1_layers/partition_data_3840.mat"
+
+        cartpole_control_mat_file = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/" \
+                                    "updated_ctrl/cartpole/2_layers/partition_data_3840.mat"
 
         state_list = [
                         # np.array([0, 0, -5*math.pi/180, 0]),
                       # np.array([0, 0, -3*math.pi/180, 0]),
-                      np.array([0.0, 0.0, 2*math.pi/180, 0.0]),
+                      # np.array([0.0, 0.0, 2*math.pi/180, 0.0]),
                       # np.array([0, 0, 1*math.pi/180, 0]),
                       # np.array([0, 0, 3*math.pi/180, 0]),
-                      # np.array([0, 0, 5*math.pi/180, 0])
+                      # np.array([0, 0, 5*math.pi/180, 0]),
+                        np.array([0.0, 0.0, 0, 0.0])
                       ]
+        # state_list = [
+        #     np.array([0, 0, -5*math.pi/180, 0]),
+        #     np.array([0, 0, -3*math.pi/180, 0]),
+        #     np.array([0.0, 0.0, 2 * math.pi / 180, 0.0]),
+        #     np.array([0, 0, 1*math.pi/180, 0]),
+        #     np.array([0, 0, 3*math.pi/180, 0]),
+        #     np.array([0, 0, 5*math.pi/180, 0])
+        # ]
         # _system_state = np.array([0, 0, -5*math.pi/180, 0])
-
-        for _system_state in state_list:
-        # simulate cartpole behavior
-            simulate_cartpole_w_cbf(system_state=_system_state,
-                                    mat_file_dir=cartpole_control_mat_file,
-                                    print_flag=True,
-                                    use_controller=True,
-                                    visualize=True,
-                                    rollout=500,
-                                    num_controllers=1,
-                                    record_flag=False,
-                                    simulate=True)
-
+        # c = 0
+        # for _ in range(100):
+        #     for _system_state in state_list:
+        #         # simulate cartpole behavior
+        #         flag = simulate_cartpole_w_cbf(system_state=_system_state,
+        #                                        mat_file_dir=cartpole_control_mat_file,
+        #                                        print_flag=True,
+        #                                        use_controller=False,
+        #                                        visualize=False,
+        #                                        rollout=100,
+        #                                        num_controllers=1,
+        #                                        record_flag=False,
+        #                                        simulate=False)
+        #         if flag is not None:
+        #             c += 1
+        #
+        #     print(f"The System Violated Safety constraints {c} times")
         # file_path = "/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/pendulum_control_data/" \
         #             "cartpole_model_5_rollout_100_2_22_17_58_47.npy"
         #
         # plot_from_data_file(file_path=file_path)
 
         # simulate_cartpole_from_data_file(file_path=file_path)
+
+        #### for plotting multiple times quickly, we only load the mat file and TF model once and pass it
+        control_dict = loadmat(cartpole_control_mat_file)
+        eps = control_dict.get("eps")
+        state_space = control_dict.get("state_space")
+        s_dim = state_space.shape[0]  # System dimension
+
+        control_coeff_matrix = control_dict.get('array_control')
+
+        partitions, partition_dim_list = get_hypercube(eps=eps.flatten(),
+                                                       state_space=state_space,
+                                                       n=s_dim,
+                                                       print_flag=False)
+
+        # get partitions to create the look up dictionary
+        partition_from_mat = control_dict.get('partitions')
+
+        # process it before creating the dict
+        processed_partitions = postprocess_partition_dump(partition_from_mat)
+
+        # create the hypercube lookup dict
+        hypercube_idx_dict = create_hypercube_idx_dict(processed_partitions)
+
+        # 2 layer model
+        cartpole_model = get_cartpole_tf_model_2_cross_x_models(hidden_neurons=128,
+                                                                variables_path="/home/karan/Documents/research/nn_veri_w_crown/rl_train_agent/cartpole_models/" \
+                           "2_layer/0_001_loss/" \
+                           "cartpole_model_2_cross_128_loss_0.001_data_50000/variables/variables",
+                                                                print_flag=False)
+        # 1 layer model
+        # cartpole_model = get_cartpole_tf_model_1_cross_x_models(hidden_neurons=128,
+        #                                                         variables_path="/home/karan/Documents/research/"
+        #                                                                        "nn_veri_w_crown/rl_train_agent/"
+        #                                                                        "cartpole_models/"
+        #                                                             "cartpole_model_1_cross_128_loss_0.01_data_2500",
+        #                                                         print_flag=True)
+
+        state_dim = 4
+        my_dpi = 106
+        fig, axs = plt.subplots(state_dim, figsize=(660 / my_dpi, 520 / my_dpi), dpi=my_dpi)
+        fig.suptitle('Cartpole Monte Carlo Simulation - w/o Controller')
+        ylabels: list = [r"$x (m)$", r"$\dot{x} (m/s)$", r"$\theta (deg)$", r"$\dot{\theta} (deg/s)$"]
+        bdry_dict = dict({0: [-1, 1],
+                          2: [-math.pi / 15, math.pi / 15],
+                          1: [-0.5, 0.5],
+                          3: [-0.5, 0.5]})
+
+        for _ in range(10):
+            state, control = mul_plot_cartpole_w_cbf_evolution(system_state=state_list[0],
+                                                           tf_model=cartpole_model,
+                                                           processed_partitions=processed_partitions,
+                                                           partition_dim_list=partition_dim_list,
+                                                           rollout=100,
+                                                           use_controller=False)
+
+            for ax_id in range(state_dim):
+                if state_dim > 1:
+                    axs[ax_id].plot(state[:, ax_id], label=ylabels[ax_id])
+                    axs[ax_id].set(ylabel=ylabels[ax_id])
+                    # axs[ax_id].grid()
+
+                else:
+                    axs.plot(control[:, ax_id], label=[r"$u1 $"])
+                    axs.set(xlabel='time-step', ylabel=ylabels[ax_id])
+                    axs.legend(loc='best')
+                    axs.grid()
+
+                # if plot_boundary:
+                # extract upper and lower bounds
+                if state_dim > 1:
+                    for axs_num, bounds in bdry_dict.items():
+                        axs[axs_num].axhline(y=bounds[0], color='k', linestyle='--')
+                        axs[axs_num].axhline(y=bounds[1], color='k', linestyle='--')
+                else:
+                    bdry_dict = dict({0: [-1, 1]})
+                    bounds = bdry_dict.get(0)  # if the dim is less than 1 then the key has to be for 1st state
+                    axs.axhline(y=bounds[0], color='k', linestyle='--')
+                    axs.axhline(y=bounds[1], color='k', linestyle='--')
+
+            plt.plot()
+
+        axs[0].grid()
+        axs[1].grid()
+        axs[2].grid()
+        axs[3].grid()
+        plt.show()
